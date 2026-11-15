@@ -1,0 +1,751 @@
+\documentclass[12pt,a4paper,oneside]{report}
+
+% ==================== PACKAGES ====================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\usepackage{booktabs,tabularx,array}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc}
+\usepackage[most]{tcolorbox}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage{titlesec}
+
+% ==================== COULEURS (THEME ARIJ) ====================
+\definecolor{bleu}{HTML}{153568}
+\definecolor{orange}{HTML}{FF6900}
+\definecolor{bleuclair}{HTML}{159BFF}
+\definecolor{fondorange}{HTML}{FFF3EA}
+\definecolor{gris}{HTML}{555555}
+
+\hypersetup{colorlinks=true,linkcolor=bleu,citecolor=bleu,urlcolor=orange}
+\setstretch{1.12}
+\setlength{\parindent}{0.45cm}
+\setlength{\parskip}{3pt}
+
+% ==================== EN-TETE ET PIED DE PAGE ====================
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\textcolor{bleu}{\textbf{ENET'Com} | Génie Informatique Industrielle (1GII)}}
+\rhead{\small\textcolor{gris}{Sujet 22 -- Phases 3 et 4}}
+\lfoot{\small\textcolor{gris}{Ligne de tri automatique par couleur}}
+\rfoot{\small\textcolor{orange}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{bleu}\leaders\hrule height \headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0pt}
+
+% ==================== TITRES ====================
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries\color{bleu}}
+  {\filleft\small\color{orange}CHAPITRE\hspace{0.4cm}\tikz[baseline=(n.base)]\node[fill=orange,circle,text=white,inner sep=5pt] (n) {\thechapter};}
+  {10pt}{\Huge}
+  [\vspace{5pt}\color{bleuclair}\titlerule]
+\titleformat{\section}{\Large\bfseries\color{bleu}}
+{\color{orange}\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\bfseries\color{bleu}}{\color{orange}\thesubsection}{0.7em}{}
+\titlespacing*{\chapter}{0pt}{-10pt}{25pt}
+\titlespacing*{\section}{0pt}{18pt}{9pt}
+
+% ==================== BOITES ====================
+\newtcolorbox{objectif}[1]{
+  enhanced,breakable,colback=fondorange,colframe=orange,boxrule=0.8pt,
+  arc=3mm,left=4mm,right=4mm,top=2mm,bottom=2mm,
+  title=#1,fonttitle=\bfseries\color{white},colbacktitle=orange,
+  attach boxed title to top left={yshift=-1mm,xshift=0mm},
+  boxed title style={arc=2mm,boxrule=0pt}
+}
+\newtcolorbox{remarque}{colback=blue!3,colframe=bleu,arc=2mm,boxrule=0.6pt,breakable}
+
+% ==================== INFORMATIONS A MODIFIER ====================
+\newcommand{\Etudiants}{Ayman Feki, Ismail Abaoub, Karim Boudaya}
+\newcommand{\Encadrante}{Mme Ferdaous Masmoudi}
+\newcommand{\Annee}{2026/2027}
+\newcommand{\TitreProjet}{Ligne de tri automatique par couleur}
+\raggedright
+\begin{document}
+
+% ==================== PAGE DE GARDE ====================
+\begin{titlepage}
+\thispagestyle{empty}
+\begingroup
+\setstretch{1}
+\setlength{\parskip}{0pt}
+\begin{center}
+
+\begin{minipage}[t]{0.32\textwidth}
+  \centering\scriptsize
+  République Tunisienne\\
+  Ministère de l'Enseignement Supérieur\\
+  et de la Recherche Scientifique\\[3pt]
+  \rule{2cm}{0.4pt}\\[-1pt]\rule{2cm}{0.4pt}\\[3pt]
+  Université de Sfax\\[3pt]
+  \rule{2cm}{0.4pt}\\[-1pt]\rule{2cm}{0.4pt}\\[3pt]
+  École nationale d'électronique\\
+  et des télécommunications de Sfax
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \IfFileExists{logo.png.png}
+    {\includegraphics[width=5cm]{logo.png.png}}
+    {\fbox{\parbox[c][2.1cm][c]{5cm}{\centering\small ENET'Com}}}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering\scriptsize\vspace{1.4cm}
+  \textbf{\textcolor{bleu}{Ingénieur en :}}\\
+  Génie Informatique Industriel
+\end{minipage}
+
+\vspace{4pt}
+{\color{bleu}\rule{\textwidth}{1.6pt}}\\[-5pt]
+{\color{orange}\rule{\textwidth}{0.6pt}}
+
+\vspace{1.2cm}
+{\fontsize{42}{46}\selectfont\bfseries\textcolor{bleu}{MINI PROJET}}\\[4pt]
+{\color{bleu}\rule{0.7\textwidth}{1.8pt}}\\[-7pt]
+{\color{orange}\rule{0.7\textwidth}{0.8pt}}
+
+\vspace{1.2cm}
+{\large\bfseries\itshape\textcolor{bleu}{Présenté à}}
+
+\vspace{0.3cm}
+{\Large\bfseries L'École Nationale d'Électronique et des\\
+Télécommunications de Sfax}
+
+\vspace{1.2cm}
+{\bfseries\itshape\textcolor{bleu}{Par}}
+
+\vspace{0.2cm}
+{\Large\bfseries Ayman Feki, Ismail Abaoub, Karim Boudaya}
+
+\vspace{0.4cm}
+{\normalsize Encadrante : Dr-Ing Ferdaous Masmoudi}
+
+\vspace{1.2cm}
+{\color{bleu}\rule{0.8\textwidth}{0.8pt}}\\[8pt]
+{\LARGE\bfseries\textcolor{bleu}{Ligne de tri automatique par couleur}}\\[2pt]
+{\color{orange}\rule{0.8\textwidth}{2.5pt}}
+
+\vspace{0.3cm}
+{\large Rendu 2 : Phases 3 et 4}
+
+\vspace{1cm}
+\begin{tikzpicture}[scale=0.9]
+  \draw[fill=bleu!10,draw=bleu,rounded corners=2pt] (0,0) rectangle (8,0.65);
+  \foreach \x in {0.5,1.5,...,7.5}{\draw[fill=orange!75,draw=orange] (\x,0.325) circle (0.13);}
+  \draw[very thick,bleu] (0.3,-0.25)--(7.7,-0.25);
+  \draw[fill=bleu] (1,-0.25) circle (0.28);
+  \draw[fill=bleu] (7,-0.25) circle (0.28);
+  \draw[-{Stealth[length=3mm]},orange,thick] (3.2,1.1)--(3.2,0.72);
+  \node[above,text=orange] at (3.2,1.1) {Détection de couleur};
+  \draw[fill=orange!20,draw=orange,thick] (5.3,0.65)--(5.9,1.2)--(6.5,0.65)--cycle;
+  \node[below,text=bleu] at (4,-0.65) {Convoyeur motorisé};
+\end{tikzpicture}
+
+\vfill
+\vspace{0.4cm}
+{\large\color{bleu}Année universitaire 2026/2027}
+\end{center}
+\endgroup
+\end{titlepage}
+
+% ==================== TABLE DES MATIERES ====================
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+% ==================== CHAPITRE 3 ====================
+\setcounter{chapter}{2} % Les phases 1 et 2 sont déjà les chapitres 1 et 2 du rapport global.
+\chapter{Modélisation mathématique du système}
+\begin{objectif}{Objectif de cette phase}
+Établir un modèle mathématique simplifié du convoyeur afin de décrire l'évolution de sa vitesse et de préparer la conception d'une commande permettant de suivre une consigne de vitesse.
+\end{objectif}
+
+\section{Introduction}
+Le système étudié est une ligne de tri automatique permettant de transporter des objets sur un convoyeur, de détecter leur couleur puis de les orienter vers l'un de deux bacs à l'aide d'un volet motorisé. La vitesse du convoyeur doit rester aussi proche que possible de sa valeur de référence, même en présence d'une variation de la charge mécanique.
+
+Dans cette phase, la modélisation concerne principalement la chaîne d'entraînement du convoyeur. La détection des objets et leur orientation sont décrites séparément par une logique séquentielle.
+
+\begin{remarque}
+\textbf{Continuité avec les phases 1 et 2.} Le système, les composants et les choix techniques restent ceux du premier rendu : ESP32, moteur DC avec réducteur, pont en H commandé en PWM, codeur incrémental, cellule infrarouge OMRON E3Z-D61, capteur de couleur TCS34725 et servomoteur SG90. La solution retenue reste une régulation PI de vitesse associée à une machine à états pour le tri.
+\end{remarque}
+
+\section{Hypothèses simplificatrices}
+Pour obtenir un modèle exploitable, les hypothèses suivantes sont adoptées :
+\begin{itemize}[leftmargin=1.1cm]
+  \item le moteur à courant continu est représenté par un modèle dynamique du premier ordre ;
+  \item le rayon du rouleau moteur est constant et la courroie ne glisse pas sur les rouleaux ;
+  \item la vitesse du convoyeur est proportionnelle à la vitesse de rotation du rouleau ;
+  \item les paramètres du moteur sont considérés constants pendant une simulation ;
+  \item les frottements et les variations de charge sont regroupés dans une perturbation équivalente ;
+  \item la boucle de régulation agit uniquement sur la vitesse du convoyeur ; le tri reste géré par une logique séquentielle indépendante.
+\end{itemize}
+
+\section{Identification des grandeurs du modèle}
+Les principales grandeurs utilisées dans le modèle sont présentées dans le tableau suivant.
+\begin{table}[H]
+\centering
+\caption{Variables et paramètres du modèle}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{>{\centering\arraybackslash}p{2.3cm} X >{\centering\arraybackslash}p{3cm}}
+\toprule
+\textbf{Symbole} & \textbf{Signification} & \textbf{Unité}\\
+\midrule
+$\omega_{c}$ & Consigne de vitesse du rouleau & tr/min\\
+$\omega(t)$ & Vitesse réelle du rouleau & tr/min\\
+$u(t)$ & Rapport cyclique PWM normalisé appliqué au pont en H & --\\
+$d(t)$ & Perturbation équivalente liée à la charge résistante & selon le modèle\\
+$K_m$ & Gain statique du moteur & tr/min par unité de commande\\
+$\tau_m$ & Constante de temps du moteur & s\\
+$e(t)$ & Erreur de régulation, $e(t)=\omega_{c}(t)-\omega(t)$ & tr/min\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Caractéristiques du moteur retenu dans la phase 2}
+Les caractéristiques disponibles dans la fiche technique utilisée lors de la phase 2 sont rappelées ci-dessous afin de conserver le même actionneur dans la modélisation.
+\begin{table}[H]
+\centering
+\caption{Données du moteur DC retenu }
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{0.82\textwidth}{Xc}
+\toprule
+\textbf{Caractéristique} & \textbf{Valeur indiquée}\\
+\midrule
+Tension nominale & $12\ \text{V DC}$\\
+Vitesse nominale & $40\ \text{tr/min}$\\
+Rapport de réduction & $1/240$\\
+Couple nominal & $120\ \text{N}\cdot\text{m}$\\
+Couple maximal & $180\ \text{N}\cdot\text{m}$\\
+Courant nominal & $250\ \text{mA}$\\
+\bottomrule
+\end{tabularx}
+\end{table}
+\begin{remarque}
+La phase 2 ne fournit pas directement la constante de temps $\tau_m$ ni le gain dynamique $K_m$. Ces paramètres ne peuvent donc pas être déduits complètement de ce tableau. Ils devront être identifiés par un essai ou déterminés à partir de mesures. Les valeurs de couple sont reprises telles qu'elles figurent dans le premier rendu ; leur unité devra être revérifiée sur la fiche technique originale avant la validation finale.
+\end{remarque}
+
+La consigne nominale imposée par le cahier des charges est de $40\ \text{tr/min}$ au niveau du rouleau, dans une plage de fonctionnement simulée de $0$ à $60\ \text{tr/min}$. Le codeur incrémental fournit la vitesse mesurée $\omega_m(t)$ à l'ESP32 ; cette mesure est comparée à la consigne pour former l'erreur $e(t)$. Le correcteur PI calcule ensuite le rapport cyclique PWM envoyé au pont en H. La conversion vers les radians par seconde est donnée par :
+\begin{equation}
+\omega_{rad/s}=\omega_{tr/min}\frac{2\pi}{60}.
+\end{equation}
+
+\section{Établissement du modèle dynamique du moteur DC}
+Le moteur à courant continu est décrit à partir de ses deux phénomènes physiques :
+le circuit électrique de l'induit et la dynamique mécanique de rotation. Cette
+modélisation permet de faire apparaître la force contre-électromotrice, le couple
+électromagnétique et le couple résistant appliqué par la charge.
+
+\subsection{Équation électrique de l'induit}
+En appliquant la loi des mailles au circuit de l'induit, on obtient :
+\begin{equation}
+\boxed{u(t)=R i(t)+L\frac{di(t)}{dt}+e(t)}
+\label{eq:electrique}
+\end{equation}
+Avec:
+
+$u(t)$ :La tension appliquée à l'induit. 
+
+$i(t)$: Le courant. 
+
+$R$: La résistance de l'induit. 
+
+$L$: Inductance.
+
+$e(t)$: La force contre-électromotrice. Elle est proportionnelle à la vitesse angulaire :
+\begin{equation}
+\boxed{e(t)=K_e\,\omega(t)}
+\label{eq:fcem}
+\end{equation}
+En transformée de Laplace, avec des conditions initiales nulles :
+\begin{equation}
+U(p)=(R+Lp)I(p)+K_e\Omega(p).
+\label{eq:elec_laplace}
+\end{equation}
+
+\subsection{Équation mécanique}
+Le principe fondamental de la dynamique en rotation donne :
+\begin{equation}
+\boxed{J\frac{d\omega(t)}{dt}+f\omega(t)=C_m(t)-C_r(t)}
+\label{eq:mecanique}
+\end{equation}
+Avec:
+
+$J$: L'inertie équivalente.
+
+$f$: Le coefficient de frottement visqueux.
+
+$C_r(t)$ Le couple résistant.
+
+$C_m(t)$: Le couple moteur. il est
+proportionnel au courant d'induit :
+\begin{equation}
+\boxed{C_m(t)=K_t i(t)}.
+\label{eq:couple}
+\end{equation}
+Dans le domaine de Laplace :
+\begin{equation}
+(Jp+f)\Omega(p)=K_t I(p)-C_r(p).
+\label{eq:meca_laplace}
+\end{equation}
+
+\subsection{Schéma-blocs électromécanique du moteur}
+Le schéma ci-dessous reprend la structure physique du moteur DC. Les expressions
+mathématiques sont inscrites directement dans les blocs, suivant la représentation
+classique utilisée pour un moteur à courant continu. Le premier sommateur calcule
+la tension nette $U(p)-E(p)$ ; le deuxième calcule le couple résultant
+$C_m(p)-C_r(p)$. La vitesse est renvoyée vers l'entrée par le gain $K_e$ pour
+représenter la force --électromotrice.
+
+
+\begin{figure}[H]
+\centering
+\resizebox{0.95\textwidth}{!}{%
+\begin{tikzpicture}[
+    >=Stealth,
+    signal/.style={->,>=Stealth,thick},
+    bloc/.style={
+        draw=black,
+        fill=white,
+        minimum width=1.65cm,
+        minimum height=0.9cm,
+        align=center,
+        line width=0.8pt
+    },
+    gain/.style={
+        draw=black,
+        fill=white,
+        minimum width=0.8cm,
+        minimum height=0.65cm,
+        align=center,
+        line width=0.8pt
+    },
+    somme/.style={
+        draw=black,
+        circle,
+        fill=white,
+        minimum size=8mm,
+        inner sep=0pt,
+        line width=0.8pt
+    }
+]
+
+% =============== CHAINE DIRECTE ===============
+
+\node (U) at (0,0) {$U(p)$};
+
+\node[somme] (S1) at (1.8,0) {};
+
+\node[bloc] (Elec) at (4.4,0)
+{$\displaystyle\frac{1}{R+Lp}$};
+
+\node[gain] (Kt) at (6.9,0) {$K_t$};
+
+\node[somme] (S2) at (9.0,0) {};
+
+\node[bloc] (Meca) at (11.5,0)
+{$\displaystyle\frac{1}{Jp+f}$};
+
+\node (W) at (13.4,0) {$\Omega(p)$};
+
+% Liaisons principales
+\draw[signal] (U) -- (S1);
+\draw[signal] (S1) -- (Elec);
+\draw[signal] (Elec) -- node[above] {$I(p)$} (Kt);
+\draw[signal] (Kt) -- node[above] {$C_m(p)$} (S2);
+\draw[signal] (S2) -- (Meca);
+\draw[signal] (Meca) -- (W);
+
+% =============== SOMMATEURS ===============
+
+\node at (1.8,0.23) {\scriptsize $+$};
+\node at (1.8,-0.23) {\scriptsize $-$};
+
+\node at (9.0,0.23) {\scriptsize $-$};
+\node at (9.0,-0.23) {\scriptsize $+$};
+
+% =============== COUPLE RESISTANT ===============
+
+\node (Cr) at (9.0,1.35) {$C_r(p)$};
+\draw[signal] (Cr) -- (S2.north);
+
+% =============== RETOUR DE VITESSE ===============
+
+\node[gain] (Ke) at (6.0,-2.5) {$K_e$};
+
+% Descente depuis la sortie
+\draw[signal]
+    (W.south) -- (13.4,-2.5)
+    -- (Ke.east);
+
+% Retour vers le sommateur d'entrée
+\draw[signal]
+    (Ke.west) -- (1.8,-2.5)
+    -- (S1.south);
+
+% Étiquette du signal de retour
+\node[above] at (3.6,-2.5) {$E(p)$};
+
+\end{tikzpicture}%
+}
+\caption{Schéma-blocs électromécanique du moteur à courant continu}
+\label{fig:modele_dc}
+\end{figure}
+
+
+\subsection{Fonction de transfert du moteur}
+Pour déterminer la fonction de transfert entre la tension d'induit et la vitesse,
+on considère d'abord le couple résistant nul, $C_r(p)=0$. À partir des équations
+\eqref{eq:elec_laplace} et \eqref{eq:meca_laplace}, on élimine le courant $I(p)$.
+On obtient :
+\begin{equation}
+\boxed{\frac{\Omega(p)}{U(p)}=
+\frac{K_t}{(R+Lp)(Jp+f)+K_tK_e}}
+\label{eq:FTmoteur_complet}
+\end{equation}
+En développant le dénominateur :
+\begin{equation}
+G_{DC}(p)=\frac{K_t}{LJp^2+(RJ+Lf)p+(Rf+K_tK_e)}.
+\label{eq:FTmoteur_developpee}
+\end{equation}
+
+\subsection{Modèle simplifié du premier ordre retenu pour la simulation}
+Dans le projet, la commande $u(t)$ est le rapport cyclique PWM normalisé envoyé
+au pont en H. La tension moyenne appliquée à l'induit est donc approchée par
+$U(t)=V_{nom}u(t)$, avec $V_{nom}=12\,\mathrm{V}$ selon la phase 2. Pour obtenir
+le modèle simple demandé dans le sujet, on néglige l'inductance de l'induit devant
+la dynamique mécanique lorsque cette approximation est valable ($L\simeq 0$).
+La fonction de transfert entre le rapport cyclique PWM et la vitesse devient alors :
+\begin{equation}
+G(p)\simeq\frac{V_{nom}K_t}{RJp+(Rf+K_tK_e)}
+=\frac{K_m}{\tau_m p+1},
+\label{eq:FTmoteur}
+\end{equation}
+avec :
+\begin{equation}
+\boxed{K_m=\frac{V_{nom}K_t}{Rf+K_tK_e}},\qquad
+\boxed{\tau_m=\frac{RJ}{Rf+K_tK_e}}.
+\label{eq:parametres_reduits}
+\end{equation}
+Cette forme est cohérente avec le modèle simplifié proposé dans le catalogue du
+sujet. En tenant compte du couple résistant, l'équation différentielle équivalente
+s'écrit sous la forme :
+\begin{equation}
+\boxed{\tau_m\frac{d\omega(t)}{dt}+\omega(t)
+=K_m u(t)-d(t)}.
+\label{eq:moteur}
+\end{equation}
+Le terme $d(t)$ représente l'effet du couple résistant ramené à une perturbation
+équivalente sur la vitesse. Il ne s'agit pas directement du couple $C_r$ en
+$\mathrm{N\,m}$ : la conversion dépend des paramètres du moteur et du réducteur.
+
+En négligeant la perturbation, la fonction de transfert simplifiée est donc :
+\begin{equation}
+\boxed{G(p)=\frac{\Omega(p)}{U(p)}=\frac{K_m}{\tau_m p+1}}.
+\end{equation}
+Les paramètres $R$, $L$, $J$, $f$, $K_t$ et $K_e$ ne figurent pas dans les données
+fournies dans la phase 2. De même, $K_m$ et $\tau_m$ ne sont pas donnés : ils
+restent à identifier expérimentalement ou à partir d'une fiche technique complète.
+Aucune valeur numérique n'est donc imposée dans cette étape.
+
+\section{Schéma-blocs de la régulation PI en boucle fermée}
+Le schéma électromécanique précédent décrit le moteur lui-même. Il faut lui associer
+la boucle de régulation définie dans la phase 2 : l'ESP32 calcule l'erreur entre la
+consigne et la vitesse mesurée, applique le correcteur PI, puis limite la commande
+PWM avant de piloter le pont en H.
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[>=Stealth, thick,
+  bloc/.style={draw=bleu,fill=blue!3,minimum width=2.0cm,minimum height=1.0cm,align=center,line width=0.9pt},
+  somme/.style={draw=bleu,circle,fill=white,minimum size=8mm,inner sep=0pt,line width=0.9pt},
+  signal/.style={->,>=Stealth,thick}]
+  \node (ref) at (0,0) {$\Omega_{ref}(p)$};
+  \node[somme] (S) at (1.55,0) {};
+  \node[bloc] (PI) at (4.35,0) {$\displaystyle K_p+\frac{K_i}{p}$\\[-0mm]\scriptsize Correcteur PI};
+  \node[bloc] (Sat) at (7.35,0) {$0\leq u_{sat}\leq 1$\\[-0mm]\scriptsize PWM / saturation};
+  \node[bloc] (G) at (10.45,0) {$\displaystyle\frac{K_m}{\tau_m p+1}$\\[-0mm]\scriptsize Moteur + convoyeur};
+  \node (out) at (12.65,0) {$\Omega(p)$};
+  \draw[signal] (ref)--(S);
+  \draw[signal] (S)--(PI);
+  \draw[signal] (PI)--(Sat);
+  \draw[signal] (Sat)--(G);
+  \draw[signal] (G)--(out);
+  \node at (1.55,0.18) {\scriptsize $+$};
+  \node at (1.55,-0.18) {\scriptsize $-$};
+  \node[above=3mm of S] {\small $E(p)=\Omega_{ref}(p)-\Omega_m(p)$};
+  \draw[thick] (out.east) -- ++(0.45,0) |- (12.95,-1.75) -| (S.south);
+  \node[below=2mm] at (7.1,-1.75) {\small Codeur : $\Omega_m(p)=\Omega(p)$};
+\end{tikzpicture}%
+}
+\caption{Boucle fermée de régulation de vitesse avec correcteur PI, conforme au choix de la phase 2}
+\label{fig:boucle_pi}
+\end{figure}
+
+En régime linéaire, lorsque la saturation n'est pas active, la fonction de transfert
+du correcteur PI est :
+\begin{equation}
+\boxed{C(p)=K_p+\frac{K_i}{p}=\frac{K_pp+K_i}{p}}.
+\label{eq:PI}
+\end{equation}
+La fonction de transfert en boucle fermée, pour un retour unitaire et en négligeant
+la perturbation, est :
+\begin{equation}
+T(p)=\frac{C(p)G(p)}{1+C(p)G(p)}.
+\end{equation}
+En utilisant le modèle simplifié du premier ordre, on obtient :
+\begin{equation}
+\boxed{\frac{\Omega(p)}{\Omega_{ref}(p)}=
+\frac{K_m(K_pp+K_i)}{\tau_m p^2+(1+K_mK_p)p+K_mK_i}}.
+\label{eq:BF}
+\end{equation}
+Cette expression est valable pour l'étude linéaire sans saturation. En simulation,
+la limitation physique du PWM et l'anti-windup seront ajoutés conformément à la
+phase 1.
+
+\section{Modélisation de la logique de tri}
+La fonction de tri est indépendante de la boucle de régulation de vitesse. Pour assurer la continuité avec le graphe séquentiel présenté dans la phase 1, on conserve les états suivants :
+\begin{table}[H]
+\centering
+\caption{Machine à états du tri (reprise de la phase 1)}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{>{\centering\arraybackslash}p{1.2cm} X X}
+\toprule
+\textbf{État} & \textbf{Nom} & \textbf{Action réalisée}\\
+\midrule
+S0 & Initialisation / READY & Initialisation des capteurs et mise au neutre du volet.\\
+S1 & WAIT & Attente du front montant de la cellule infrarouge.\\
+S2 & PIECE DETECTED & Détection et positionnement de la pièce sous le capteur.\\
+S3 & COLOR READING & Acquisition des composantes $R$, $G$, $B$ et $C$ par le TCS34725.\\
+S4 & DECISION & Comparaison des seuils et identification de la catégorie A ou B.\\
+S5 & DELAY & Attente du délai de déplacement $\Delta t=d/v$.\\
+S6 & ACTUATION & Commande du SG90 vers la position correspondant au bac choisi.\\
+S7 & COUNT / RETURN & Comptage de la pièce, retour du volet au neutre puis retour à S1.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+La vitesse mesurée par le codeur est transmise à la logique de tri afin d'estimer la vitesse linéaire du convoyeur $v$. Si $d$ désigne la distance entre le capteur de couleur et le volet, le délai de synchronisation est :
+\begin{equation}
+\boxed{\Delta t=\frac{d}{v}}
+\label{eq:delai}
+\end{equation}
+Cette relation reprend celle introduite dans la phase 1. Elle suppose que $v$ est exprimée en unité de longueur par seconde et que $d$ est exprimée dans la même unité de longueur. La logique doit respecter un espacement minimal de $5\ \text{s}$ entre deux objets dans le scénario demandé.
+
+Pour la classification, les composantes mesurées par le TCS34725 peuvent être normalisées par la composante claire $C$, comme présenté dans la phase 2 :
+\begin{equation}
+ r=\frac{R}{C},\qquad g=\frac{G}{C},\qquad b=\frac{B}{C}.
+\end{equation}
+Les valeurs normalisées sont ensuite comparées aux seuils de décision définis pour les deux catégories de couleur. L'éclairage blanc et la protection contre la lumière ambiante doivent être conservés afin de stabiliser les mesures. La simulation de tri portera sur au moins 20 objets et devra atteindre un taux de classification correct d'au moins 90\%.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.65cm,>=Stealth,
+ etat/.style={draw=orange,fill=fondorange,rounded corners,minimum width=3.1cm,minimum height=0.75cm,align=center}]
+\node[etat] (a) {Attente d'un objet};
+\node[etat,below=of a] (b) {Détection IR};
+\node[etat,below=of b] (c) {Lecture de couleur};
+\node[etat,below=of c] (d) {Classification};
+\node[etat,below left=0.8cm and 0.4cm of d] (e) {Orientation vers bac 1};
+\node[etat,below right=0.8cm and 0.4cm of d] (f) {Orientation vers bac 2};
+\node[etat,below=2.0cm of d] (g) {Retour du volet};
+\draw[->,thick,bleu] (a)--(b); \draw[->,thick,bleu] (b)--(c); \draw[->,thick,bleu] (c)--(d);
+\draw[->,thick,bleu] (d)--node[left,font=\small]{Catégorie 1}(e);
+\draw[->,thick,bleu] (d)--node[right,font=\small]{Catégorie 2}(f);
+\draw[->,thick,bleu] (e)--(g); \draw[->,thick,bleu] (f)--(g);
+\draw[->,thick,bleu] (g.west) -- ++(-5.0,0) |- (a.west);
+\end{tikzpicture}
+\caption{Diagramme simplifié de la séquence de tri}
+\end{figure}
+
+\section{Conclusion de la phase 3}
+Cette phase a permis d'établir un modèle du premier ordre pour la dynamique de vitesse du moteur et de distinguer la régulation du convoyeur de la logique séquentielle de tri. La fonction de transfert obtenue servira de base à la simulation en boucle ouverte puis à l'étude d'un correcteur PI.
+
+% ==================== CHAPITRE 4 ====================
+\chapter{Simulation et première commande}
+\begin{objectif}{Objectif de cette phase}
+Simuler le comportement du système sans correcteur puis avec une commande adaptée, comparer les réponses obtenues et étudier l'effet d'une perturbation mécanique sur la vitesse du convoyeur.
+\end{objectif}
+
+\section{Démarche de simulation}
+La simulation est réalisée à partir de la fonction de transfert du moteur donnée par l'équation \eqref{eq:FTmoteur}. Les paramètres $K_m$ et $\tau_m$ doivent être renseignés à partir du moteur retenu. En l'absence de données constructeur ou de mesures expérimentales, les courbes numériques ne doivent pas être présentées comme des résultats réels : les paramètres utilisés devront être explicitement indiqués dans le compte rendu.
+
+\section{Étude en boucle ouverte}
+Dans un premier temps, aucune correction n'est appliquée. Le moteur reçoit directement une commande en échelon. Pour une entrée constante $u(t)=u_0$, et en négligeant la perturbation, la réponse du modèle du premier ordre est :
+\begin{equation}
+\omega(t)=K_m u_0\left(1-e^{-t/\tau_m}\right),\qquad t\geq 0.
+\end{equation}
+Cette réponse permet d'observer la rapidité du moteur et sa valeur finale. En boucle ouverte, une variation de charge peut modifier la vitesse et aucune action automatique ne vient corriger l'écart par rapport à la consigne.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{figures/reponse_boucle_ouverte.png}{
+  \includegraphics[width=0.88\textwidth]{figures/reponse_boucle_ouverte.png}
+}{
+  \includegraphics[width=\linewidth]{01_reponse_boucle_ouverte.png}
+}
+\caption{Réponse du moteur en boucle ouverte}
+\end{figure}
+
+\section{Choix du correcteur PI}
+Un correcteur proportionnel-intégral est retenu pour réguler la vitesse. Sa fonction de transfert a été établie en phase 3 (équation \eqref{eq:PI}).
+Le terme proportionnel $K_p$ agit sur l'erreur instantanée et contribue à accélérer la réponse. Le terme intégral $K_i$ accumule l'erreur au cours du temps et permet, sous les conditions usuelles de stabilité, d'annuler l'erreur statique pour une consigne constante.
+
+Conformément à l'architecture définie dans la phase 1, la commande PWM est limitée à sa plage physique :
+\begin{equation}
+ u_{sat}(t)=\min\bigl(1,\max(0,u(t))\bigr).
+\end{equation}
+
+
+\subsection{Rappel du modèle en boucle fermée}
+La fonction de transfert en boucle fermée utilisée pour la simulation est celle
+établie en phase 3 (équation \eqref{eq:BF}). Elle repose sur un retour unitaire
+de vitesse et sur le modèle simplifié du moteur.
+
+\section{Étude en boucle fermée}
+La consigne nominale est fixée à $40\ \text{tr/min}$. Le correcteur PI est inséré dans la boucle de retour afin que la vitesse mesurée suive cette consigne. Les gains $K_p$ et $K_i$ seront réglés par simulation, puis leurs valeurs seront reportées dans le tableau des paramètres.
+
+\begin{table}[H]
+\centering
+\caption{Paramètres à renseigner pour la simulation}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{0.85\textwidth}{X c}
+\toprule
+\textbf{Paramètre} & \textbf{Valeur utilisée}\\
+\midrule
+Gain moteur $K_m$ & À déterminer\\
+Constante de temps $\tau_m$ & À déterminer\\
+Gain proportionnel $K_p$ & À régler\\
+Gain intégral $K_i$ & À régler\\
+Consigne $\omega_{ref}$ & $40\ \text{tr/min}$\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\IfFileExists{figures/reponse_boucle_fermee.png}{
+  \includegraphics[width=0.88\textwidth]{figures/reponse_boucle_fermee.png}
+}{
+\includegraphics[width=\linewidth]{02_reponse_boucle_fermee_PI.png}
+}
+\caption{Suivi de la consigne avec le correcteur PI}
+\end{figure}
+
+La courbe devra être commentée en précisant le temps de réponse, le dépassement maximal, l'erreur statique et la stabilité. Les valeurs seront calculées à partir des résultats de simulation et non estimées visuellement sans justification.
+
+\subsection{La saturation PWM et l’anti-windup }
+Une stratégie anti-windup devra empêcher l'intégrateur de continuer à accumuler l'erreur lorsque la commande atteint une saturation. Le signal $u_{sat}(t)$ est celui envoyé au pont en H par l'ESP32.
+
+La saturation PWM et l'anti-windup
+sont ensuite pris en compte dans le modèle de simulation non linéaire.
+
+\centering\includegraphics[width=\linewidth]{Windup.png}
+\section{Comparaison des deux fonctionnements}
+Le tableau ci-dessous constitue la grille de comparaison à compléter après les simulations.
+\begin{table}[H]
+\raggedleft
+\caption{Comparaison en boucle ouverte et en boucle fermée}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\textwidth}{Xcc}
+\toprule
+\textbf{Critère} & \textbf{Boucle ouverte} & \textbf{Boucle fermée avec PI}\\
+\midrule
+Erreur statique & -0.0247 & -0.0001\\
+Temps de réponse & 0.9100 & 0.4500\\
+Dépassement maximal & 0.0630 & 1.2941\\
+Rejet d'une perturbation & À observer & À observer\\
+Suivi de la consigne & À observer & À observer\\
+\bottomrule
+\end{tabularx}
+\end{table}
+\includegraphics[width=\linewidth]{05_comparaison_BO_BF.png}
+
+\section{Étude de l'effet d'une perturbation}
+{
+\centering
+\includegraphics[width=\linewidth]{06_perturbation_charge.png}
+}
+Le cahier des charges prévoit une augmentation de 20\% du couple résistant pendant le fonctionnement du convoyeur. Cette variation est représentée par une augmentation de 20\% du couple résistant nominal. Dans le modèle simplifié, elle se traduit par une augmentation de la perturbation équivalente $d(t)$ :
+\[
+\tau_m\frac{d\omega(t)}{dt}+\omega(t)=K_m u(t)-d(t).
+\]
+La correspondance exacte entre le couple résistant en $\text{N}\cdot\text{m}$ et la perturbation $d(t)$ en vitesse équivalente dépend des paramètres mécaniques et du moteur. Elle devra être établie lors de l'identification ; il ne faut pas assimiler directement une hausse de couple de 20\% à une hausse numérique de 20\% de $d(t)$ sans justification.
+On compare la vitesse avant et après l'application de la perturbation. En boucle ouverte, la vitesse doit subir une variation sans correction automatique. En boucle fermée, le PI doit agir sur la commande afin de ramener la vitesse vers la consigne, dans la limite des capacités du moteur et du réglage du correcteur.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{figures/rejet_perturbation.png}{
+  \includegraphics[width=0.88\textwidth]{figures/rejet_perturbation.png}
+}
+\caption{Réponse du système à une perturbation de charge}
+\end{figure}
+
+\section{Simulation du tri des objets}
+La simulation fonctionnelle du tri est menée séparément de la régulation de vitesse. Le scénario minimal comprend 20 objets virtuels répartis en deux catégories de couleur, avec un intervalle d'au moins 5 secondes entre deux objets successifs. Pour chaque objet, la simulation enregistre la couleur réelle, la couleur détectée et le bac choisi.
+
+Le taux de classification correct est calculé par :
+\begin{equation}
+\text{Taux de réussite}=\frac{N_{correct}}{N_{total}}\times 100\%.
+\end{equation}
+Le critère demandé est un taux de réussite supérieur ou égal à 90\%. Il faudra également tester un rapprochement de deux objets avec un intervalle inférieur à 5 secondes afin d'identifier et de documenter la limite de cadence du système.
+
+\begin{table}[H]
+\centering
+\caption{Bilan du scénario de tri (à compléter après exécution)}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{0.9\textwidth}{Xc}
+\toprule
+Nombre total d'objets & 20 au minimum\\
+Nombre d'objets correctement triés & À mesurer\\
+Nombre d'erreurs de classification & À mesurer\\
+Taux de réussite & À calculer\\
+Intervalle minimal entre objets & $5\ \text{s}$\\
+\bottomrule
+\end{tabularx}
+\end{table}
+{
+\centering\includegraphics[width=\linewidth]{07b_simulation_tri_zoom.png}
+}
+\section{Vérification des exigences du cahier des charges}
+\begin{table}[H]
+\centering
+\caption{Critères de performance à vérifier}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{XcX}
+\toprule
+\textbf{Critère} & \textbf{Exigence} & \textbf{Résultat obtenu}\\
+\midrule
+Vitesse de consigne & $40\ \text{tr/min}$ & À renseigner\\
+Erreur en régime permanent & $\leq 2\ \text{tr/min}$ & À vérifier\\
+Dépassement & $\leq 10\%$ & À vérifier\\
+Plage de vitesse simulée & $0$ à $60\ \text{tr/min}$ & À vérifier\\
+Classification correcte & $\geq 90\%$ sur 20 objets & À vérifier\\
+Perturbation de charge & $+20\%$ & À tester\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Codes sur GitHub}
+
+\url{https://github.com/ismail3b3-netizen/Mini-projet-automatique/tree/main}
+
+\section{Conclusion de la phase 4}
+La simulation en boucle ouverte permet de caractériser le comportement naturel du moteur, tandis que la boucle fermée avec PI vise à améliorer le suivi de la consigne et le rejet des perturbations. La validation finale dépendra des courbes obtenues avec les paramètres réels ou identifiés du moteur. Le scénario de tri permettra, séparément, de vérifier le fonctionnement de la détection, de la classification et du volet d'orientation.
+
+% ==================== CONCLUSION GENERALE ====================
+
+\end{document}
