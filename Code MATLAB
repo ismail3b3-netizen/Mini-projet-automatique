@@ -1,0 +1,855 @@
+%% =========================================================================
+%  Mini-projet d'automatique 1GII - Sujet 22 : Ligne de tri automatique par couleur
+%  Phases 3 et 4 : modélisation + simulations  (version MATLAB)
+%  =========================================================================
+%  Exécution : ouvrir ce fichier et cliquer sur "Run" (ou  >> simulation_moteur_tri).
+%  Version requise : MATLAB R2018b ou plus récent (fonctions locales en fin de script, xline, NumColumns).
+%  Toolbox : AUCUNE obligatoire. Control System Toolbox facultative (figure 10 de validation).
+%  Sorties : dossier figures/ (PNG 300 DPI) et dossier resultats/ (CSV).
+%  Encodage du fichier : UTF-8 (accents dans les figures).
+%
+%  Deux fonctions DISTINCTES :
+%   (A) Régulation de vitesse : moteur DC + PI + PWM saturée + anti-windup (simulate)
+%   (B) Logique de tri : machine à états S0..S7 (run_sorting). Elle ne contient AUCUN
+%       calcul de PI : elle lit seulement la vitesse MESURÉE produite par (A).
+%
+%  Provenance des paramètres :
+%   [CdC] donnée du cahier des charges / de l'énoncé
+%   [HYP] HYPOTHÈSE DE SIMULATION (valeur provisoire, NON mesurée) -> à remplacer
+%  =========================================================================
+clear; close all; clc;
+here = fileparts(mfilename('fullpath')); if isempty(here), here = pwd; end
+figdir = fullfile(here,'figures');   if ~exist(figdir,'dir'), mkdir(figdir); end
+resdir = fullfile(here,'resultats'); if ~exist(resdir,'dir'), mkdir(resdir); end
+
+%% =========================================================================
+%  1. PARAMÈTRES  (SEULE SECTION À MODIFIER)
+%  =========================================================================
+P = struct();
+% ---- 1.1 Cahier des charges [CdC] ----------------------------------------
+P.V_SUP        = 12;      % [CdC] tension d'alimentation = PWM 100 % (V)
+P.N_GEAR       = 240;     % [CdC] réducteur 1/240
+P.N_REF        = 40;      % [CdC] vitesse de référence du convoyeur (tr/min)
+P.CR_FACTOR    = 1.20;    % [CdC] +20 % de couple résistant pendant le fonctionnement
+P.CR_OUT_NOM   = 120;     % [CdC] couple résistant nominal côté convoyeur (N.m) -> +20 % = +24 N.m
+P.T_MIN_PIECES = 5;       % [CdC] temps minimal entre deux pièces (s)
+P.TAUX_MIN     = 90;      % [CdC] taux de tri correct minimal (%)
+P.N_PIECES     = 20;      % [CdC] nombre de pièces
+% Critères chiffrés du catalogue (non communiqués) : renseigner pour un verdict automatique ([] = non fourni)
+P.CDC_DEPASSEMENT_MAX_PCT = [];
+P.CDC_TR5_MAX_S           = [];
+P.CDC_ERREUR_STAT_MAX_RPM = [];
+
+% ---- 1.2 Moteur DC : paramètres manquants -> HYPOTHÈSES [HYP] -------------
+% Compatibles avec Cr = 120 N.m : couple ramené moteur = 120/(240*0.70) = 0,714 N.m (~95 A)
+P.R_A      = 0.012;     % [HYP] résistance d'induit (ohm)
+P.L_A      = 5.0e-5;    % [HYP] inductance d'induit (H)
+P.KT       = 7.5e-3;    % [HYP] constante de couple (N.m/A)
+P.KE       = 7.5e-3;    % [HYP] constante de FCEM (V.s/rad)
+P.J_EQ     = 1.4e-3;    % [HYP] inertie équivalente ramenée à l'arbre moteur (kg.m^2)
+P.F_VISC   = 1.0e-5;    % [HYP] frottement visqueux ramené au moteur (N.m.s/rad)
+P.ETA_GEAR = 0.70;      % [HYP] rendement du réducteur
+
+% ---- 1.3 Correcteur PI ----------------------------------------------------
+% Kp, Ki de la phase 2 non disponibles : calculés par placement de pôles [HYP].
+% Pour imposer vos valeurs (V/(tr/min) et V/(tr/min.s)) :  P.KP_OVERRIDE = ...;  P.KI_OVERRIDE = ...;
+P.KP_OVERRIDE  = [];
+P.KI_OVERRIDE  = [];
+P.PI_WN        = 5.0;   % [HYP] pulsation propre souhaitée (rad/s)
+P.PI_ZETA      = 0.9;   % [HYP] amortissement souhaité
+P.AW_TT_FACTOR = 0.5;   % [HYP] anti-windup (back-calculation) : Tt = facteur * Ti
+
+% ---- 1.4 Électronique / échantillonnage [HYP] -----------------------------
+P.TS            = 0.010; % [HYP] période d'échantillonnage (s)
+P.PWM_BITS      = 10;    % [HYP] résolution PWM ESP32 ([] = sans quantification)
+P.ENCODER_QUANT = false; % [HYP] true : quantifie la vitesse mesurée
+P.ENC_CPR       = 48;    % [HYP] impulsions/tour (arbre moteur)
+
+% ---- 1.5 Convoyeur et tri [HYP] -------------------------------------------
+P.R_POULIE  = 0.025;    % [HYP] rayon du tambour (m)
+P.L_PIECE   = 0.040;    % [HYP] longueur d'une pièce (m)
+P.X_IR      = 0.10;     % [HYP] position cellule IR + capteur couleur (m)
+P.X_VOLET   = 0.45;     % [HYP] position du volet (m)
+P.D_CAPT    = P.X_VOLET - P.X_IR;   % distance d de  dt = d/v (m)
+P.COUL      = [5200 1100 900;       % [HYP] pièce rouge (R,G,B) -> catégorie A / bac 1
+               900  1500 5000];     % [HYP] pièce bleue (R,G,B) -> catégorie B / bac 2
+P.BRUIT_REL = 0.08;     % [HYP] bruit relatif par canal (écart-type)
+P.BRUIT_ABS = 150;      % [HYP] bruit additif (comptes)
+P.T_INTEG   = 0.154;    % TCS34725 : 2,4 ms x 64 cycles = 154 ms
+P.T_INIT    = 0.5;      % [HYP] durée de S0 (s)
+P.T_DEBOUNCE= 0.005;    % [HYP] anti-rebond IR (s)
+P.T_MARGE   = 0.25;     % [HYP] maintien du volet après passage (s)
+P.T_AVANCE  = 0.15;     % [HYP] avance de commande du volet (s)
+P.THETA_N   = 90;       % position neutre (deg)
+P.THETA_A   = 60;       % volet vers bac 1 (rouge)
+P.THETA_B   = 120;      % volet vers bac 2 (bleu)
+P.SERVO_RATE= 500;      % [HYP] vitesse max SG90 (deg/s)
+P.THETA_TOL = 8;        % tolérance d'angle (deg)
+P.DT        = 0.001;    % pas de la machine à états (s)
+
+% ---- 1.6 Scénarios ---------------------------------------------------------
+P.T_BO        = 3;        % durée simulation 1 (s)
+P.T_BF        = 6;        % durée simulation 2 (s)
+P.T_PERT      = 10;       % instant de la perturbation (s)
+P.T_FIN_PERT  = 20;
+P.SEQ_T       = [0 6 12]; % simulation 4 : instants (s)
+P.SEQ_V       = [30 40 50]; % consignes (tr/min)  [exemple du support]
+P.T_FIN_CONS  = 18;
+P.T_PERT_TRI  = 60;       % +20 % de couple pendant le tri (s)
+P.SEED        = 2026;
+P.N_MC        = 2000;     % tirages Monte-Carlo
+
+P = derive(P);
+
+% style graphique
+set(groot,'defaultAxesFontSize',9,'defaultAxesXGrid','on','defaultAxesYGrid','on', ...
+    'defaultAxesGridLineStyle','--','defaultAxesGridAlpha',0.35,'defaultAxesBox','on', ...
+    'defaultLineLineWidth',1.5,'defaultAxesFontName','Times New Roman');
+P.C_BO=[0.85 0.33 0.10]; P.C_BF=[0 0.447 0.741]; P.C_ERR=[0.64 0.08 0.18]; P.C_CMD=[0.47 0.67 0.19];
+P.FOOT = ['[CdC] 12 V (PWM 100 %) ; réducteur 1/240 ; consigne 40 tr/min ; couple résistant nominal 120 N·m, ' ...
+          '+20 % = +24 N·m.   [HYP] R, L, Kt, Ke, J, f, η, gains PI.'];
+cr_const  = @(t) P.CR_OUT_NOM;
+ref_const = @(t) P.N_REF;
+ctrl_bo   = struct('mode','open','duty',P.DUTY_BO);
+ctrl_pi   = struct('mode','PI','kp',P.KP,'ki',P.KI,'aw',true);
+
+%% =========================================================================
+%  2. PHASE 3 : MODÈLES ET VÉRIFICATION
+%  =========================================================================
+fprintf('%s\nPHASE 3 - MODÈLES  (paramètres [HYP] à remplacer)\n%s\n',repmat('=',1,78),repmat('=',1,78));
+den2 = [P.L_A*P.J_EQ, P.L_A*P.F_VISC+P.R_A*P.J_EQ, P.DEN0];
+poles_full = roots(den2);
+fprintf('Fonction de transfert complète  W/U = Kt / (LJ p^2 + (Lf+RJ) p + (Rf+KeKt))\n');
+fprintf('   pôles : %.2f rad/s et %.2f rad/s\n',poles_full(1),poles_full(2));
+fprintf('Modèle simplifié (L -> 0) : tau_m = %.4f s ; Km = %.3f (tr/min conv.)/V ; tau_e/tau_m = %.4f\n', ...
+    P.TAU_M,P.KM_RPM,P.TAU_E/P.TAU_M);
+fprintf('   Cr nominal = %.0f N.m -> %.3f N.m côté moteur ; +20 %% = %.0f N.m\n',P.CR_OUT_NOM,P.CR_M_NOM,0.2*P.CR_OUT_NOM);
+fprintf('   PWM de BO pour %.0f tr/min = %.1f %% (%.2f V) ; vitesse linéaire v = %.4f m/s\n', ...
+    P.N_REF,P.DUTY_BO*100,P.DUTY_BO*P.V_SUP,v_lin(P,P.N_REF));
+fprintf('Correcteur PI : Kp = %.4f V/(tr/min), Ki = %.4f V/(tr/min.s), Ti = %.4f s\n',P.KP,P.KI,P.TI);
+% HBF = CG/(1+CG) : CG = Km(Kp p + Ki)/[p(tau p + 1)]
+num_cg  = P.KM_RPM*[P.KP P.KI];
+den_cg  = conv([1 0],[P.TAU_M 1]);
+hbf_den = polyadd(den_cg,num_cg);
+hbf_num = num_cg;
+den_lit = [P.TAU_M, 1+P.KM_RPM*P.KP, P.KM_RPM*P.KI];
+tf_ok   = all(abs(hbf_den-den_lit) < 1e-9);
+poles_bf = roots(hbf_den);
+wn   = sqrt(P.KM_RPM*P.KI/P.TAU_M);
+zeta = (1+P.KM_RPM*P.KP)/(2*P.TAU_M*wn);
+fprintf('HBF(p) = Km(Kp p+Ki)/(tau p^2 + (1+Km Kp) p + Km Ki) -> vérification polynomiale : %d\n',tf_ok);
+fprintf('   pôles BF = %s ; stable : %d ; wn = %.3f rad/s ; zeta = %.3f ; HBF(0) = %.6f\n', ...
+    mat2str(poles_bf.',4),all(real(poles_bf)<0),wn,zeta,hbf_num(end)/hbf_den(end));
+poles_bf3 = roots(polyadd(conv([1 0],den2/den2(3)),num_cg));
+fprintf('   BF avec moteur complet (3e ordre) : pôles = %s ; stable : %d\n',mat2str(poles_bf3.',4),all(real(poles_bf3)<0));
+
+% Validation numérique (nécessite Control System Toolbox)
+if exist('tf','file')==2 && license('test','Control_Toolbox')
+    t  = (0:1e-4:2)';
+    Gf = tf(P.KT*P.RADS2RPM/P.N_GEAR, den2);
+    Gs = tf(P.KM_RPM,[P.TAU_M 1]);
+    yf = step(Gf,t); ys = step(Gs,t);
+    dev_models = max(abs(yf-ys))/yf(end)*100;
+    A0 = 5; t2 = (0:P.TS:3-P.TS)';
+    yth = A0*step(tf(hbf_num,hbf_den),t2);
+    cpi = struct('mode','PI','kp',P.KP,'ki',P.KI,'aw',true);
+    ss_ = simulate(P,3-P.TS,@(t)A0,@(t)0,cpi,'simple',1);
+    sf_ = simulate(P,3-P.TS,@(t)A0,@(t)0,cpi,'full',1);
+    n_ = min(numel(yth),numel(ss_.t));
+    fprintf('VALIDATION : complet vs simplifié = %.3f %% ; HBF vs simulation (simplifié) = %.3f %% ; (complet) = %.3f %%\n', ...
+        dev_models, max(abs(yth(1:n_)-ss_.n(1:n_)))/A0*100, max(abs(yth(1:n_)-sf_.n(1:n_)))/A0*100);
+    f = newfig(5.2);
+    subplot(2,1,1); plot(t,yf,'Color',P.C_BF); hold on; plot(t,ys,'--','Color',P.C_BO);
+    title('Validation du modèle simplifié : échelon de 1 V (boucle ouverte)'); xlabel('Temps (s)'); ylabel('Vitesse (tr/min)');
+    legend('Modèle complet (2e ordre)','Modèle simplifié Km/(\tau_m p+1)','Location','southeast');
+    subplot(2,1,2); plot(t2,yth,'k'); hold on; plot(ss_.t(1:n_),ss_.n(1:n_),'--','Color',P.C_BF); plot(sf_.t(1:n_),sf_.n(1:n_),':','Color',P.C_ERR);
+    title('Validation de H_{BF}(p) (échelon de 5 tr/min)'); xlabel('Temps (s)'); ylabel('Vitesse du convoyeur (tr/min)');
+    legend('H_{BF}(p) analytique','Simulation PI - simplifié','Simulation PI - moteur complet','Location','southeast');
+    pl_save(f,figdir,'10_validation_modeles.png');
+else
+    fprintf('(Validation numérique ignorée : Control System Toolbox absente)\n');
+end
+
+%% =========================================================================
+%  3. PHASE 4 : SIMULATION 1 - BOUCLE OUVERTE
+%  =========================================================================
+fprintf('\n%s\nPHASE 4 - SIMULATIONS\n%s\n',repmat('=',1,78),repmat('=',1,78));
+fprintf('\n--- Simulation 1 : boucle ouverte (PWM constante) ---\n');
+d_bo = simulate(P,P.T_BO,ref_const,cr_const,ctrl_bo,'full',1);
+writetable(struct2table(d_bo),fullfile(resdir,'sim1_boucle_ouverte.csv'));
+m_bo = step_metrics(d_bo.t,d_bo.n,0,P.N_REF,d_bo.duty,0,d_bo.t(end));
+fprintf('   PWM = %.2f %% ; vitesse finale = %.3f tr/min ; t_montée = %.3f s ; t_5%% = %.3f s ; dépassement = %.2f %%\n', ...
+    P.DUTY_BO*100,m_bo.vfin,m_bo.tr,m_bo.ts,m_bo.os);
+f = newfig(5.0);
+subplot(2,1,1); plot(d_bo.t,d_bo.n,'Color',P.C_BO); hold on;
+plot([0 P.T_BO],[P.N_REF P.N_REF],'--k','LineWidth',1);
+plot([0 P.T_BO],[m_bo.vfin m_bo.vfin],':','Color',[.5 .5 .5]);
+plot(P.TAU_M,0.632*m_bo.vfin,'ko','MarkerSize',4);
+plot([m_bo.ts m_bo.ts],[0 1.1*P.N_REF],'--','Color',[0.49 0.18 0.56],'LineWidth',1);
+title('Simulation 1 - Réponse du moteur en boucle ouverte (PWM constante)'); ylabel('Vitesse du convoyeur (tr/min)');
+legend('Vitesse mesurée',sprintf('Consigne nominale [CdC] = %.0f tr/min',P.N_REF), ...
+    sprintf('Valeur finale = %.2f tr/min',m_bo.vfin),sprintf('t = \\tau_m = %.3f s (63,2 %%)',P.TAU_M), ...
+    sprintf('Temps de réponse 5 %% = %.2f s',m_bo.ts),'Location','southeast');
+subplot(2,1,2); plot(d_bo.t,d_bo.duty*100,'Color',P.C_CMD); hold on; plot([0 P.T_BO],[100 100],':k','LineWidth',0.9);
+ylim([0 108]); xlabel('Temps (s)'); ylabel('Rapport cyclique PWM (%)');
+legend('Commande PWM','Limite : 12 V = 100 % [CdC]','Location','southeast');
+foot(f,P.FOOT); pl_save(f,figdir,'01_reponse_boucle_ouverte.png');
+
+%% =========================================================================
+%  4. SIMULATION 2 - BOUCLE FERMÉE PI
+%  =========================================================================
+fprintf('\n--- Simulation 2 : boucle fermée avec PI, consigne %.0f tr/min ---\n',P.N_REF);
+d_bf = simulate(P,P.T_BF,ref_const,cr_const,ctrl_pi,'full',1);
+writetable(struct2table(d_bf),fullfile(resdir,'sim2_boucle_fermee_PI.csv'));
+m_bf = step_metrics(d_bf.t,d_bf.n,0,P.N_REF,d_bf.duty,0,d_bf.t(end));
+fprintf('   t_montée = %.3f s ; t_rép.5%% = %.3f s ; dépassement = %.2f %% ; erreur statique = %.4f tr/min ; PWM max = %.1f %%\n', ...
+    m_bf.tr,m_bf.ts,m_bf.os,m_bf.ess,m_bf.pwm);
+% fig 02
+f = newfig(3.4);
+plot(d_bf.t,d_bf.ref,'--k'); hold on; plot(d_bf.t,d_bf.n,'Color',P.C_BF);
+patch([0 3 3 0],[0.95 0.95 1.05 1.05]*P.N_REF,[.5 .5 .5],'FaceAlpha',0.15,'EdgeColor','none');
+plot([m_bf.ts m_bf.ts],[0 1.1*P.N_REF],':','Color',[0.49 0.18 0.56]);
+xlim([0 3]); title('Simulation 2 - Réponse en boucle fermée avec correcteur PI');
+xlabel('Temps (s)'); ylabel('Vitesse du convoyeur (tr/min)');
+legend(sprintf('Consigne [CdC] (%.0f tr/min)',P.N_REF),'Vitesse réelle (PI)','Bande ±5 %', ...
+    sprintf('t_{r,5%%} = %.2f s',m_bf.ts),'Location','southeast');
+text(2.95,28,sprintf('Dépassement = %.1f %%\nErreur statique = %.3f tr/min\nt_m = %.2f s', ...
+    m_bf.os,abs(m_bf.ess),m_bf.tr),'HorizontalAlignment','right','BackgroundColor','w','EdgeColor',[.5 .5 .5],'FontSize',8);
+foot(f,P.FOOT); pl_save(f,figdir,'02_reponse_boucle_fermee_PI.png');
+% fig 03
+f = newfig(4.6);
+subplot(2,1,1); plot(d_bf.t,d_bf.e,'Color',P.C_ERR); hold on; plot([0 P.T_BF],[0 0],'k','LineWidth',0.8);
+title('Simulation 2 - Erreur de vitesse e(t) = consigne - vitesse mesurée'); xlabel('Temps (s)'); ylabel('Erreur (tr/min)');
+mz = d_bf.t > m_bf.ts;
+subplot(2,1,2); plot(d_bf.t(mz),d_bf.e(mz),'Color',P.C_ERR); hold on; plot([m_bf.ts P.T_BF],[0 0],'k','LineWidth',0.8);
+title('Zoom en régime établi (après le temps de réponse à 5 %)'); xlabel('Temps (s)'); ylabel('Erreur (tr/min)');
+foot(f,['e(t) = consigne [CdC : 40 tr/min] - vitesse mesurée.   ' P.FOOT]); pl_save(f,figdir,'03_erreur_vitesse.png');
+% fig 04
+f = newfig(5.0);
+subplot(2,1,1); plot(d_bf.t,d_bf.u_dem/P.V_SUP*100,'--','Color',[.5 .5 .5]); hold on;
+plot(d_bf.t,d_bf.duty*100,'Color',P.C_CMD); plot([0 P.T_BF],[100 100],':k','LineWidth',0.9);
+title('Simulation 2 - Signal de commande PWM'); ylabel('Rapport cyclique (%)');
+legend('Commande demandée par le PI (avant saturation)','Commande PWM appliquée (saturée)','Saturation : 12 V = 100 % [CdC]','Location','northeast');
+subplot(2,1,2); plot(d_bf.t,d_bf.uP,'Color',[0.49 0.18 0.56]); hold on; plot(d_bf.t,d_bf.uI,'Color',[0.6 0.4 0.2]);
+xlabel('Temps (s)'); ylabel('Contribution (V)');
+legend('Action proportionnelle K_p e','Action intégrale (état de l''intégrateur)','Location','northeast');
+foot(f,P.FOOT); pl_save(f,figdir,'04_commande_PWM.png');
+
+%% =========================================================================
+%  5. SIMULATION 3 - COMPARAISON BO / BF
+%  =========================================================================
+fprintf('\n--- Simulation 3 : comparaison boucle ouverte / boucle fermée ---\n');
+d_bo_s = simulate(P,P.T_BF,ref_const,cr_const,ctrl_bo,'full',0.9);  % test additionnel : alimentation -10 %
+d_bf_s = simulate(P,P.T_BF,ref_const,cr_const,ctrl_pi,'full',0.9);
+cases = {'BO - nominal',d_bo;'BF PI - nominal',d_bf;'BO - alim. -10 % (additionnel)',d_bo_s;'BF PI - alim. -10 % (additionnel)',d_bf_s};
+nC = size(cases,1); M3 = zeros(nC,6);
+for i = 1:nC
+    dd = cases{i,2}; mm = step_metrics(dd.t,dd.n,0,P.N_REF,dd.duty,0,dd.t(end));
+    M3(i,:) = [mm.tr mm.ts mm.os mm.ess mm.vfin mm.pwm];
+end
+tab3 = table(cases(:,1),M3(:,1),M3(:,2),M3(:,3),M3(:,4),M3(:,5),M3(:,6),'VariableNames', ...
+    {'Cas','t_montee_s','t_rep5_s','depassement_pct','erreur_statique_rpm','vitesse_finale_rpm','pwm_max_pct'});
+writetable(tab3,fullfile(resdir,'tableau_performances.csv')); disp(tab3);
+f = newfig(5.2);
+subplot(2,1,1); plot(d_bf.t,d_bf.ref,'--k'); hold on; plot(d_bo.t,d_bo.n,'Color',P.C_BO); plot(d_bf.t,d_bf.n,'Color',P.C_BF);
+xlim([0 P.T_BF]); title('Simulation 3 - Comparaison boucle ouverte / boucle fermée (nominal)'); ylabel('Vitesse du convoyeur (tr/min)');
+legend('Consigne [CdC] 40 tr/min','Boucle ouverte (PWM constante)','Boucle fermée (PI)','Location','southeast');
+subplot(2,1,2); plot(d_bo.t,d_bo.duty*100,'Color',P.C_BO); hold on; plot(d_bf.t,d_bf.duty*100,'Color',P.C_BF);
+xlim([0 P.T_BF]); ylim([0 105]); xlabel('Temps (s)'); ylabel('Rapport cyclique PWM (%)');
+legend('Commande BO','Commande BF (PI, saturée)','Location','northeast');
+foot(f,P.FOOT); pl_save(f,figdir,'05_comparaison_BO_BF.png');
+f = newfig(3.3);
+plot(d_bf.t,d_bf.ref,'--k'); hold on; plot(d_bo_s.t,d_bo_s.n,'Color',P.C_BO); plot(d_bf_s.t,d_bf_s.n,'Color',P.C_BF);
+xlim([0 P.T_BF]); title('Test additionnel de robustesse : alimentation réduite de 10 %'); xlabel('Temps (s)'); ylabel('Vitesse du convoyeur (tr/min)');
+legend('Consigne','BO - alimentation -10 %','BF PI - alimentation -10 %','Location','southeast');
+pl_save(f,figdir,'05b_robustesse_alimentation.png');
+
+%% =========================================================================
+%  6. SIMULATION 4 - CHANGEMENT DE CONSIGNE
+%  =========================================================================
+fprintf('\n--- Simulation 4 : changements de consigne 30 -> 40 -> 50 tr/min ---\n');
+ref4 = @(t) interp1(P.SEQ_T,P.SEQ_V,t,'previous','extrap');
+d4 = simulate(P,P.T_FIN_CONS,ref4,cr_const,ctrl_pi,'full',1);
+writetable(struct2table(d4),fullfile(resdir,'sim4_changement_consigne.csv'));
+nS = numel(P.SEQ_T); M4 = zeros(nS,5); labels4 = cell(nS,1);
+for j = 1:nS
+    ts_ = P.SEQ_T(j); v_ = P.SEQ_V(j);
+    if j < nS, t1_ = P.SEQ_T(j+1)-P.TS; else, t1_ = P.T_FIN_CONS; end
+    if j == 1, y0_ = 0; else, y0_ = P.SEQ_V(j-1); end
+    mm = step_metrics(d4.t,d4.n,y0_,v_,d4.duty,ts_,t1_);
+    M4(j,:) = [mm.tr mm.ts mm.os mm.ess mm.pwm]; labels4{j} = sprintf('%.0f -> %.0f tr/min',y0_,v_);
+    fprintf('   %18s : t_m = %.3f s ; t_5%% = %.3f s ; D = %.2f %% ; e_s = %.4f ; PWM max = %.1f %%\n', ...
+        labels4{j},mm.tr,mm.ts,mm.os,mm.ess,mm.pwm);
+end
+tab4 = table(labels4,M4(:,1),M4(:,2),M4(:,3),M4(:,4),M4(:,5),'VariableNames', ...
+    {'echelon','t_montee_s','t_rep5_s','depassement_pct','erreur_statique_rpm','pwm_max_pct'});
+writetable(tab4,fullfile(resdir,'sim4_metriques.csv'));
+f = newfig(6.4);
+a1 = subplot(3,1,1); plot(d4.t,d4.ref,'--k'); hold on; plot(d4.t,d4.n,'Color',P.C_BF);
+title('Simulation 4 - Changements de consigne (30 \rightarrow 40 \rightarrow 50 tr/min)'); ylabel('Vitesse du convoyeur (tr/min)');
+legend('Consigne','Vitesse réelle','Location','southeast');
+a2 = subplot(3,1,2); plot(d4.t,d4.e,'Color',P.C_ERR); hold on; plot([0 P.T_FIN_CONS],[0 0],'k','LineWidth',0.8); ylabel('Erreur (tr/min)');
+a3 = subplot(3,1,3); plot(d4.t,d4.duty*100,'Color',P.C_CMD); hold on; plot(d4.t,d4.u_dem/P.V_SUP*100,'--','Color',[.5 .5 .5]);
+xlabel('Temps (s)'); ylabel('Rapport cyclique (%)'); ylim([0 max(105,max(d4.u_dem/P.V_SUP*100)*1.05)]);
+legend('PWM appliquée','PWM demandée','Location','northwest');
+for a = [a1 a2 a3]
+    for tt = P.SEQ_T(2:end), xline(a,tt,':','Color',[.5 .5 .5]); end
+end
+foot(f,['Séquence 30 -> 40 -> 50 tr/min : exemple du support (40 tr/min = référence [CdC]).   ' P.FOOT]);
+pl_save(f,figdir,'08_changement_consigne.png');
+
+%% =========================================================================
+%  7. SIMULATION 5 - PERTURBATION DE CHARGE (+20 %)
+%  =========================================================================
+fprintf('\n--- Simulation 5 : perturbation de charge (+20 %% du couple résistant) ---\n');
+cr_pert = @(t) P.CR_OUT_NOM*(1+(P.CR_FACTOR-1)*(t>=P.T_PERT));
+d5_bo = simulate(P,P.T_FIN_PERT,ref_const,cr_pert,ctrl_bo,'full',1);
+d5_bf = simulate(P,P.T_FIN_PERT,ref_const,cr_pert,ctrl_pi,'full',1);
+writetable(struct2table(d5_bo),fullfile(resdir,'sim5_perturbation_BO.csv'));
+writetable(struct2table(d5_bf),fullfile(resdir,'sim5_perturbation_BF.csv'));
+pm_bo = pert_metrics(P,d5_bo); pm_bf = pert_metrics(P,d5_bf);
+tab5 = table({'Boucle ouverte';'Boucle fermée PI'}, [pm_bo.avant;pm_bf.avant],[pm_bo.apres;pm_bf.apres], ...
+    [pm_bo.creux;pm_bf.creux],[pm_bo.efin;pm_bf.efin],[pm_bo.trec;pm_bf.trec],[pm_bo.pwm_av;pm_bf.pwm_av],[pm_bo.pwm_ap;pm_bf.pwm_ap], ...
+    'VariableNames',{'Cas','v_avant_rpm','v_apres_rpm','creux_max_rpm','erreur_finale_rpm','retour_0p5pct_s','pwm_avant_pct','pwm_apres_pct'});
+writetable(tab5,fullfile(resdir,'sim5_metriques.csv')); disp(tab5);
+fprintf('   Le PI compense la perturbation (erreur finale < 0,5 %% de la consigne) : %d\n',abs(pm_bf.efin)<0.005*P.N_REF);
+f = newfig(9.0);
+a1 = subplot(5,1,1); plot(d5_bf.t,d5_bf.ref,'--k'); hold on; plot(d5_bo.t,d5_bo.n,'Color',P.C_BO); plot(d5_bf.t,d5_bf.n,'Color',P.C_BF);
+title(sprintf('Simulation 5 - Perturbation de charge : +20 %% de couple résistant à t = %.0f s',P.T_PERT)); ylabel('Vitesse (tr/min)');
+legend('Consigne [CdC] 40 tr/min','Boucle ouverte','Boucle fermée (PI)','Location','southeast');
+a2 = subplot(5,1,2); plot(d5_bf.t,d5_bf.ref,'--k'); hold on; plot(d5_bo.t,d5_bo.n,'Color',P.C_BO); plot(d5_bf.t,d5_bf.n,'Color',P.C_BF);
+xlim([P.T_PERT-1 P.T_PERT+5]); ylim([P.N_REF-1.6 P.N_REF+0.5]); ylabel('Zoom (tr/min)');
+a3 = subplot(5,1,3); plot(d5_bo.t,d5_bo.e,'Color',P.C_BO); hold on; plot(d5_bf.t,d5_bf.e,'Color',P.C_BF); plot([0 P.T_FIN_PERT],[0 0],'k','LineWidth',0.8);
+ylabel('Erreur (tr/min)'); legend('BO','BF (PI)','Location','northeast');
+a4 = subplot(5,1,4); plot(d5_bo.t,d5_bo.duty*100,'Color',P.C_BO); hold on; plot(d5_bf.t,d5_bf.duty*100,'Color',P.C_BF);
+ylabel('PWM (%)'); ylim([0 105]); legend('BO','BF (PI)','Location','northeast');
+a5 = subplot(5,1,5); plot(d5_bf.t,d5_bf.cr,'k'); ylim([0.9 1.3]*P.CR_OUT_NOM); xlabel('Temps (s)'); ylabel('Couple résistant (N·m)');
+text(0.3,1.15*P.CR_OUT_NOM,sprintf('Nominal [CdC] = %.0f N·m',P.CR_OUT_NOM),'FontSize',7);
+text(P.T_PERT+0.3,1.25*P.CR_OUT_NOM,sprintf('Après perturbation [CdC] : %.0f N·m (+20 %% = +%.0f N·m)', ...
+    P.CR_FACTOR*P.CR_OUT_NOM,0.2*P.CR_OUT_NOM),'FontSize',7,'Color',[0.8 0 0]);
+for a = [a1 a3 a4 a5], xline(a,P.T_PERT,':','Color',[.5 .5 .5]); end
+xline(a2,P.T_PERT,':','Color',[.5 .5 .5]);
+foot(f,P.FOOT); pl_save(f,figdir,'06_perturbation_charge.png');
+
+%% =========================================================================
+%  8. TEST ADDITIONNEL - ANTI-WINDUP
+%  =========================================================================
+fprintf('\n--- Test additionnel : anti-windup (consigne inatteignable de 4 s à 8 s) ---\n');
+ref_aw = @(t) P.N_REF + 20*(t>=4 & t<8);
+ctrl_noaw = ctrl_pi; ctrl_noaw.aw = false;
+d_aw1 = simulate(P,14,ref_aw,cr_const,ctrl_pi,'full',1);
+d_aw0 = simulate(P,14,ref_aw,cr_const,ctrl_noaw,'full',1);
+fprintf('   vitesse max atteignable (12 V) = %.1f tr/min\n',P.KM_RPM*P.V_SUP-P.KD_RPM*P.CR_M_NOM);
+dd_ = {d_aw1,d_aw0}; nm_ = {'avec','sans'};
+for i = 1:2
+    [~,i0] = min(abs(dd_{i}.t-8));
+    mm = step_metrics(dd_{i}.t,dd_{i}.n,dd_{i}.n(i0),P.N_REF,dd_{i}.duty,8,dd_{i}.t(end));
+    fprintf('   %s anti-windup : retour à ±5 %% de l''échelon en %.2f s (excursion sous la consigne = %.1f %%)\n',nm_{i},mm.ts,mm.os);
+end
+f = newfig(6.2);
+subplot(3,1,1); plot(d_aw1.t,d_aw1.ref,'--k'); hold on; plot(d_aw0.t,d_aw0.n,'Color',P.C_ERR); plot(d_aw1.t,d_aw1.n,'Color',P.C_BF);
+title('Test additionnel - Effet de l''anti-windup lors d''une saturation prolongée'); ylabel('Vitesse du convoyeur (tr/min)');
+legend('Consigne','PI sans anti-windup','PI avec anti-windup (back-calculation)','Location','southeast');
+subplot(3,1,2); plot(d_aw0.t,d_aw0.uI,'Color',P.C_ERR); hold on; plot(d_aw1.t,d_aw1.uI,'Color',P.C_BF); plot([0 14],[P.V_SUP P.V_SUP],':k');
+ylabel('État de l''intégrateur (V)'); legend('sans anti-windup','avec anti-windup','Location','northeast');
+subplot(3,1,3); plot(d_aw0.t,d_aw0.duty*100,'Color',P.C_ERR); hold on; plot(d_aw1.t,d_aw1.duty*100,'Color',P.C_BF);
+xlabel('Temps (s)'); ylabel('PWM (%)'); ylim([0 105]); legend('sans','avec','Location','southeast');
+pl_save(f,figdir,'09_anti_windup.png');
+
+%% =========================================================================
+%  9. SIMULATION 6 - LOGIQUE SÉQUENTIELLE DU TRI
+%  =========================================================================
+fprintf('\n--- Simulation 6 : logique séquentielle du tri (%d pièces) ---\n',P.N_PIECES);
+t_end6 = 6 + (P.N_PIECES-1)*(P.T_MIN_PIECES+1.5) + 14;
+cr_tri = @(t) P.CR_OUT_NOM*(1+(P.CR_FACTOR-1)*(t>=P.T_PERT_TRI));
+trace6 = simulate(P,t_end6,ref_const,cr_tri,ctrl_pi,'full',1);   % boucle PI -> vitesse mesurée
+R = run_sorting(P,trace6,P.SEED);
+df = R.df; writetable(df,fullfile(resdir,'sim6_resultats_tri.csv'));
+taux = mean(df.tri_correct)*100; R.taux = taux;
+err_t = abs(df.erreur_timing_ms);
+fprintf('   Espacement minimal entre pièces = %.2f s (contrainte >= %.1f s)\n',min(R.gaps),P.T_MIN_PIECES);
+fprintf('   Pièces détectées = %d/%d ; comptées par la FSM : bac 1 = %d, bac 2 = %d, total = %d\n', ...
+    sum(~isnan(df.t_detection_s)),P.N_PIECES,R.count(1),R.count(2),sum(R.count));
+fprintf('   Δt calculé moyen = %.3f s ; erreur de timing : moyenne |e| = %.2f ms, max = %.2f ms (marge volet = %.0f ms)\n', ...
+    mean(df.delta_t_calcule_s,'omitnan'),mean(err_t,'omitnan'),max(err_t),P.T_MARGE*1e3);
+fprintf('   Durée maximale d''un cycle S2->S7 = %.2f s (doit rester < %.1f s)\n',R.cycle_max,P.T_MIN_PIECES);
+if taux >= P.TAUX_MIN, ok_txt = 'OK'; else, ok_txt = 'NON ATTEINTE'; end
+fprintf('   TAUX DE TRI CORRECT = %.1f %%  ->  exigence >= %.0f %% : %s\n',taux,P.TAUX_MIN,ok_txt);
+plot_tri(P,R,figdir,'07_simulation_tri.png',true);
+plot_tri(P,R,figdir,'07b_simulation_tri_zoom.png',false);
+
+%% =========================================================================
+%  10. SENSIBILITÉ DU CAPTEUR COULEUR (Monte-Carlo vectorisé)
+%  =========================================================================
+fprintf('\n--- Analyse de sensibilité du capteur couleur (Monte-Carlo) ---\n');
+rng(P.SEED+1);
+timing_ok = ~isnan(df.t_detection_s);
+bruits = [0.05 0.08 0.15 0.25 0.35 0.5 0.7];
+MC = zeros(numel(bruits),5);
+nom = P.COUL(R.cat_true+1,:);
+for b = 1:numel(bruits)
+    rates = zeros(P.N_MC,1);
+    for r = 1:P.N_MC
+        rgb = max(0,nom.*(1+bruits(b)*randn(size(nom)))+P.BRUIT_ABS*randn(size(nom)));
+        sc  = (rgb(:,1)-rgb(:,3))./max(sum(rgb,2),1e-9);
+        dec = double(sc <= 0);
+        rates(r) = mean((dec==R.cat_true) & timing_ok)*100;
+    end
+    MC(b,:) = [bruits(b) mean(rates) min(rates) prctile_(rates,5) mean(rates>=P.TAUX_MIN)];
+end
+tabMC = array2table(MC,'VariableNames',{'bruit_relatif','taux_moyen_pct','taux_min_pct','percentile5_pct','P_taux_ge_90'});
+writetable(tabMC,fullfile(resdir,'sensibilite_bruit_couleur.csv')); disp(tabMC);
+f = newfig(3.2);
+plot(MC(:,1)*100,MC(:,2),'o-','Color',P.C_BF); hold on; plot(MC(:,1)*100,MC(:,4),'s--','Color',P.C_ERR);
+plot([0 75],[P.TAUX_MIN P.TAUX_MIN],':k','LineWidth',1.2); plot([P.BRUIT_REL P.BRUIT_REL]*100,[50 102],':','Color',[.5 .5 .5]);
+ylim([50 102]); xlim([0 75]);
+title(sprintf('Sensibilité du taux de tri au bruit du capteur couleur (%d tirages par point)',P.N_MC));
+xlabel('Bruit relatif par canal RGB (%)'); ylabel('Taux de tri correct (%)');
+legend('Taux moyen','Percentile 5 %','Exigence [CdC] : 90 %','Hypothèse retenue','Location','southwest');
+foot(f,'[CdC] taux de tri >= 90 %, 20 pièces.   [HYP] bruit relatif du TCS34725 et réponses RGB des pièces.');
+pl_save(f,figdir,'11_sensibilite_bruit_couleur.png');
+
+%% =========================================================================
+%  11. CONFORMITÉ AU CAHIER DES CHARGES
+%  =========================================================================
+fprintf('\n--- Conformité au cahier des charges ---\n');
+rows = {};
+vmax = max(d_bf.duty)*P.V_SUP;
+rows(end+1,:) = {'Alimentation moteur / PWM 100 %','12 V',sprintf('%.2f V max appliquée',vmax),verdict(vmax<=P.V_SUP+1e-9)};
+rows(end+1,:) = {'Réducteur','1/240',sprintf('%d ; moteur à %d tr/min',P.N_GEAR,P.N_REF*P.N_GEAR),verdict(true)};
+rows(end+1,:) = {'Vitesse de référence',sprintf('%d tr/min',P.N_REF),sprintf('%.3f tr/min',m_bf.vfin),verdict(abs(m_bf.vfin-P.N_REF)<0.005*P.N_REF)};
+rows(end+1,:) = {'Couple résistant nominal',sprintf('%d N·m',P.CR_OUT_NOM),sprintf('%.0f N·m',min(d5_bf.cr)),verdict(abs(min(d5_bf.cr)-P.CR_OUT_NOM)<1e-9)};
+dc = max(d5_bf.cr)-min(d5_bf.cr);
+rows(end+1,:) = {'Perturbation de charge +20 %',sprintf('+%.0f N·m (%.0f N·m)',0.2*P.CR_OUT_NOM,P.CR_FACTOR*P.CR_OUT_NOM), ...
+    sprintf('+%.1f N·m (%.0f N·m)',dc,max(d5_bf.cr)),verdict(abs(dc-0.2*P.CR_OUT_NOM)<1e-9)};
+rows(end+1,:) = {'Perturbation compensée (PI)','compensation',sprintf('erreur finale %.3f tr/min (creux %.2f)',abs(pm_bf.efin),pm_bf.creux), ...
+    verdict(abs(pm_bf.efin)<0.005*P.N_REF)};
+rows(end+1,:) = {'Nombre de pièces triées',sprintf('%d',P.N_PIECES),sprintf('%d comptées',sum(R.count)),verdict(sum(R.count)==P.N_PIECES)};
+rows(end+1,:) = {'Temps minimal entre pièces',sprintf('>= %d s',P.T_MIN_PIECES),sprintf('%.2f s min',min(R.gaps)),verdict(min(R.gaps)>=P.T_MIN_PIECES)};
+et = max(err_t);
+rows(end+1,:) = {'Délai de déplacement dt = d/v','dt = d/v',sprintf('dt = %.3f s ; écart max/réel %.1f ms',mean(df.delta_t_calcule_s,'omitnan'),et),verdict(et<P.T_MARGE*1e3)};
+rows(end+1,:) = {'Taux de tri correct',sprintf('>= %d %%',P.TAUX_MIN),sprintf('%.0f %%',taux),verdict(taux>=P.TAUX_MIN)};
+rows(end+1,:) = {'Dépassement maximal (catalogue)',spec_txt(P.CDC_DEPASSEMENT_MAX_PCT,'%'),sprintf('%.2f %%',m_bf.os), ...
+    verdict_opt(P.CDC_DEPASSEMENT_MAX_PCT,m_bf.os)};
+rows(end+1,:) = {'Temps de réponse 5 % (catalogue)',spec_txt(P.CDC_TR5_MAX_S,'s'),sprintf('%.2f s',m_bf.ts),verdict_opt(P.CDC_TR5_MAX_S,m_bf.ts)};
+rows(end+1,:) = {'Erreur statique (catalogue)',spec_txt(P.CDC_ERREUR_STAT_MAX_RPM,'tr/min'),sprintf('%.4f tr/min',abs(m_bf.ess)), ...
+    verdict_opt(P.CDC_ERREUR_STAT_MAX_RPM,abs(m_bf.ess))};
+rows(end+1,:) = {'Courant de pointe (info)','non spécifié',sprintf('%.0f A démarrage ; %.0f A régime',max(abs(d_bf.ia)),d5_bf.ia(end)),'n/a'};
+tabC = cell2table(rows,'VariableNames',{'Exigence','Valeur_du_CdC','Valeur_simulee','Verdict'});
+writetable(tabC,fullfile(resdir,'conformite_cahier_des_charges.csv')); disp(tabC);
+f = newfig(4.3); axis off; title('Conformité des résultats de simulation au cahier des charges');
+text(0.00,1.0,'Exigence','Units','normalized','FontSize',7,'FontWeight','bold');
+text(0.34,1.0,'Valeur du CdC','Units','normalized','FontSize',7,'FontWeight','bold');
+text(0.55,1.0,'Valeur simulée','Units','normalized','FontSize',7,'FontWeight','bold');
+text(0.90,1.0,'Verdict','Units','normalized','FontSize',7,'FontWeight','bold');
+for i = 1:size(rows,1)
+    y = 1-0.065*i; col = [0 0 0]; if strcmp(rows{i,4},'conforme'), col = [0 0.5 0]; elseif strcmp(rows{i,4},'NON conforme'), col = [0.8 0 0]; end
+    text(0.00,y,rows{i,1},'Units','normalized','FontSize',7);
+    text(0.34,y,rows{i,2},'Units','normalized','FontSize',7);
+    text(0.55,y,rows{i,3},'Units','normalized','FontSize',7);
+    text(0.90,y,rows{i,4},'Units','normalized','FontSize',7,'Color',col,'FontWeight','bold');
+end
+pl_save(f,figdir,'12_conformite_cahier_des_charges.png');
+
+fprintf('\nTerminé : figures dans ./figures, tableaux et traces dans ./resultats\n');
+fprintf(['Valeurs de référence (version Python) : Kp = 0.3178 ; Ki = 1.4074 ; tau_m = 0.298 s ; BF : t_5%% = 0.43 s, D = 1.39 %% ;\n' ...
+         '   BO : t_5%% = 0.89 s ; perturbation : BO -1.18 tr/min, PI -> 0 ; dt = 3.342 s ; cycle max = 4.04 s.\n']);
+
+%% =========================================================================
+%  FONCTIONS LOCALES
+%  =========================================================================
+function P = derive(P)
+    P.RADS2RPM = 60/(2*pi);
+    P.RPM2RADS = 1/P.RADS2RPM;
+    P.CR_M_NOM = P.CR_OUT_NOM/(P.N_GEAR*P.ETA_GEAR);          % couple ramené au moteur (N.m)
+    P.DEN0   = P.R_A*P.F_VISC + P.KE*P.KT;
+    P.TAU_M  = P.R_A*P.J_EQ/P.DEN0;                           % constante de temps mécanique (s)
+    P.TAU_E  = P.L_A/P.R_A;                                   % constante de temps électrique (s)
+    P.KM_RADS = P.KT/P.DEN0;                                  % (rad/s moteur)/V
+    P.KM_RPM = P.KM_RADS*P.RADS2RPM/P.N_GEAR;                 % (tr/min convoyeur)/V
+    P.KD_RPM = (P.R_A/P.DEN0)*P.RADS2RPM/P.N_GEAR;            % (tr/min convoyeur)/(N.m moteur)
+    if isempty(P.KP_OVERRIDE)
+        P.KP = (2*P.PI_ZETA*P.PI_WN*P.TAU_M-1)/P.KM_RPM;
+        P.KI = P.PI_WN^2*P.TAU_M/P.KM_RPM;
+    else
+        P.KP = P.KP_OVERRIDE; P.KI = P.KI_OVERRIDE;
+    end
+    P.TI  = P.KP/P.KI;
+    P.KAW = 1/(P.AW_TT_FACTOR*P.TI);
+    P.DUTY_BO = (P.N_REF + P.KD_RPM*P.CR_M_NOM)/P.KM_RPM/P.V_SUP;   % PWM constante de la BO
+end
+
+function v = v_lin(P,n_rpm)
+    v = n_rpm*P.RPM2RADS*P.R_POULIE;                          % vitesse linéaire (m/s)
+end
+
+function c = polyadd(a,b)
+    n = max(numel(a),numel(b));
+    c = [zeros(1,n-numel(a)) a] + [zeros(1,n-numel(b)) b];
+end
+
+function p = prctile_(x,q)   % percentile sans toolbox Statistics
+    x = sort(x(:)); n = numel(x);
+    pos = 1+(n-1)*q/100; lo = floor(pos); hi = ceil(pos);
+    p = x(lo)+(pos-lo)*(x(hi)-x(lo));
+end
+
+function d = duty_q(P,d)
+    if ~isempty(P.PWM_BITS)
+        lv = 2^P.PWM_BITS-1; d = round(d*lv)/lv;
+    end
+end
+
+function n = meas_q(P,n)
+    if P.ENCODER_QUANT
+        q = 60/(P.ENC_CPR*P.TS*P.N_GEAR); n = round(n/q)*q;
+    end
+end
+
+function [Ad,Bd] = disc_full(P,Ts)
+    % discrétisation exacte (maintien d'ordre zéro), entrées [u ; Cr_moteur]
+    A = [-P.R_A/P.L_A, -P.KE/P.L_A; P.KT/P.J_EQ, -P.F_VISC/P.J_EQ];
+    B = [1/P.L_A, 0; 0, -1/P.J_EQ];
+    M = zeros(4); M(1:2,1:2) = A*Ts; M(1:2,3:4) = B*Ts;
+    E = expm(M); Ad = E(1:2,1:2); Bd = E(1:2,3:4);
+end
+
+function D = simulate(P,t_end,ref_fn,cr_fn,ctrl,model,vscale)
+% Simulation en temps discret (période Ts) : correcteur numérique + moteur intégré exactement.
+%   ctrl : struct('mode','open','duty',d)  ou  struct('mode','PI','kp',..,'ki',..,'aw',true/false)
+%   model: 'full' (i, w) ou 'simple' (1er ordre) ; vscale : facteur sur la tension appliquée
+    Ts = P.TS; nst = round(t_end/Ts); N = nst+1;
+    t = zeros(N,1); ref = t; n = t; nmv = t; e = t; u_dem = t; duty = t; uP = t; uI = t; cr = t; ia = t;
+    full = strcmp(model,'full');
+    if full, [Ad,Bd] = disc_full(P,Ts); x = [0;0]; else, a = exp(-Ts/P.TAU_M); xs = 0; end
+    I = 0;
+    for k = 1:N
+        tk = (k-1)*Ts;
+        if full, nk = x(2)*P.RADS2RPM/P.N_GEAR; iak = x(1); else, nk = xs; iak = NaN; end
+        nm = meas_q(P,nk);
+        rk = ref_fn(tk); crk = cr_fn(tk); cr_m = crk/(P.N_GEAR*P.ETA_GEAR);
+        ek = rk-nm;
+        if strcmp(ctrl.mode,'open')
+            udem = ctrl.duty*P.V_SUP; uPk = NaN; uIk = NaN; dk = duty_q(P,ctrl.duty);
+        else
+            uPk = ctrl.kp*ek; udem = uPk+I;
+            usat = min(max(udem,0),P.V_SUP);              % saturation PWM [0 ; 100 %]
+            dk = duty_q(P,usat/P.V_SUP); uIk = I;
+            if ctrl.aw                                    % anti-windup : back-calculation
+                I = I + Ts*(ctrl.ki*ek + P.KAW*(usat-udem));
+            else
+                I = I + Ts*ctrl.ki*ek;
+            end
+        end
+        t(k)=tk; ref(k)=rk; n(k)=nk; nmv(k)=nm; e(k)=ek; u_dem(k)=udem; duty(k)=dk; uP(k)=uPk; uI(k)=uIk; cr(k)=crk; ia(k)=iak;
+        if k <= nst
+            u_app = dk*P.V_SUP*vscale;
+            if full
+                x = Ad*x + Bd*[u_app; cr_m];
+            else
+                xs = a*xs + (1-a)*(P.KM_RPM*u_app - P.KD_RPM*cr_m);
+            end
+        end
+    end
+    D = struct('t',t,'ref',ref,'n',n,'n_meas',nmv,'e',e,'u_dem',u_dem,'duty',duty,'uP',uP,'uI',uI,'cr',cr,'ia',ia);
+end
+
+function tc = cross_t(tt,yy,level,d)
+    if d > 0, idx = find(yy>=level,1); else, idx = find(yy<=level,1); end
+    if isempty(idx), tc = NaN; return; end
+    if idx == 1, tc = tt(1); return; end
+    tc = tt(idx-1) + (level-yy(idx-1))*(tt(idx)-tt(idx-1))/(yy(idx)-yy(idx-1));
+end
+
+function m = step_metrics(t,y,y0,yf,duty,t0,t1)
+% Métriques d'une réponse indicielle sur [t0,t1] (y0 -> yf)
+    msk = (t>=t0) & (t<=t1);
+    tt = t(msk)-t0; yy = y(msk); d = yf-y0;
+    m.tr = cross_t(tt,yy,y0+0.9*d,d) - cross_t(tt,yy,y0+0.1*d,d);   % montée 10-90 %
+    out = abs(yy-yf) > 0.05*abs(d);
+    if ~any(out)
+        m.ts = 0;
+    else
+        last = find(out,1,'last');
+        if last+1 <= numel(tt), m.ts = tt(last+1); else, m.ts = NaN; end
+    end
+    if d > 0, m.os = max(0,(max(yy)-yf)/abs(d)*100); else, m.os = max(0,(yf-min(yy))/abs(d)*100); end
+    nl = max(3,floor(numel(yy)/20));
+    m.vfin = mean(yy(end-nl+1:end));
+    m.ess  = yf - m.vfin;
+    dd = duty(msk); m.pwm = max(dd)*100;
+end
+
+function pm = pert_metrics(P,d)
+    t = d.t; n = d.n;
+    pm.avant = mean(n(t>=P.T_PERT-1 & t<P.T_PERT));
+    pm.apres = mean(n(t>=P.T_FIN_PERT-1));
+    pm.creux = P.N_REF - min(n(t>=P.T_PERT));
+    pm.efin  = P.N_REF - pm.apres;
+    band = (abs(n-P.N_REF) > 0.005*P.N_REF) & (t>=P.T_PERT);
+    if any(band)
+        last = find(band,1,'last');
+        if last+1 <= numel(t), pm.trec = t(last+1)-P.T_PERT; else, pm.trec = NaN; end
+    else
+        pm.trec = 0;
+    end
+    pm.pwm_av = mean(d.duty(t>=P.T_PERT-1 & t<P.T_PERT))*100;
+    pm.pwm_ap = mean(d.duty(t>=P.T_FIN_PERT-1))*100;
+end
+
+function [cc,score] = tcs_classify(rgb)
+% Décision S4 : indice (R-B)/(R+G+B) > 0 -> catégorie 0 (rouge), sinon 1 (bleue)
+    s = sum(rgb);
+    if s > 0, score = (rgb(1)-rgb(3))/s; else, score = 0; end
+    if score > 0, cc = 0; else, cc = 1; end
+end
+
+function rgb = tcs_read(P,col)
+% Modèle du TCS34725 : comptes bruts d'une pièce (col = 1 rouge, 2 bleue) ou du fond (col = 0)
+    if col > 0, base = P.COUL(col,:); else, base = [150 150 150]; end
+    rgb = max(0, base.*(1+P.BRUIT_REL*randn(1,3)) + P.BRUIT_ABS*randn(1,3));
+end
+
+function R = run_sorting(P,trace,seed)
+% Simulation de N pièces. La machine à états n'utilise QUE la vitesse MESURÉE (n_meas) ;
+% la vitesse réelle ne sert qu'à déplacer physiquement les pièces sur le tapis.
+    rng(seed);
+    DT = P.DT; Np = P.N_PIECES;
+    t_f = (0:DT:(trace.t(end)-DT))'; nT = numel(t_f);
+    n_true = interp1(trace.t,trace.n,t_f,'linear');
+    v = v_lin(P,n_true);
+    s = [0; cumsum(0.5*(v(2:end)+v(1:end-1))*DT)];                    % abscisse parcourue par la bande
+    idz = min(floor(t_f/P.TS)+1,numel(trace.t));
+    n_meas_f = trace.n_meas(idz);                                      % vitesse mesurée (maintien)
+    % injection : espacement >= 5 s
+    t_first = 6;
+    gaps = P.T_MIN_PIECES + 1.5*rand(Np-1,1);
+    t_inj = t_first + [0; cumsum(gaps)];
+    idx_col = [ones(1,floor(Np/2)) 2*ones(1,Np-floor(Np/2))];
+    idx_col = idx_col(randperm(Np))';                                  % 1 = rouge, 2 = bleue
+    cat_true = idx_col-1;
+    names = {'rouge','bleue'};
+    s0 = interp1(t_f,s,t_inj);
+    t_at = @(k,xl) interp1(s,t_f,s0(k)+xl);
+    t_ir_on = zeros(Np,1); t_ir_off = t_ir_on; t_v_on = t_ir_on; t_v_off = t_ir_on;
+    for k = 1:Np
+        t_ir_on(k)  = t_at(k,P.X_IR);          t_ir_off(k) = t_at(k,P.X_IR+P.L_PIECE);
+        t_v_on(k)   = t_at(k,P.X_VOLET);       t_v_off(k)  = t_at(k,P.X_VOLET+P.L_PIECE);
+    end
+    ir = false(nT,1); pid = zeros(nT,1);
+    for k = 1:Np
+        m = (t_f>=t_ir_on(k)) & (t_f<t_ir_off(k)); ir(m) = true; pid(m) = k;
+    end
+    % --- machine à états ---
+    state = 0; theta = P.THETA_N; cmd = P.THETA_N; t_s = 0;
+    log_state = zeros(nT,1); log_theta = zeros(nT,1); log_cmd = zeros(nT,1);
+    cur = struct(); ev = {}; count = [0 0]; cycle_max = 0;
+    step = P.SERVO_RATE*DT;
+    for k = 1:nT
+        t = t_f(k);
+        theta = theta + min(max(cmd-theta,-step),step);               % servo SG90 : vitesse limitée
+        switch state
+            case 0                                                     % S0 initialisation
+                cmd = P.THETA_N;
+                if t >= P.T_INIT, state = 1; end
+            case 1                                                     % S1 attente
+                if ir(k), state = 2; cur = struct('t_det',t,'piece_sensor',pid(k)); end
+            case 2                                                     % S2 pièce détectée (anti-rebond)
+                if ~ir(k)
+                    state = 1; cur = struct();
+                elseif t-cur.t_det >= P.T_DEBOUNCE
+                    state = 3; t_s = t;
+                end
+            case 3                                                     % S3 lecture couleur (intégration)
+                if t-t_s >= P.T_INTEG
+                    if ir(k), col = idx_col(pid(k)); else, col = 0; end
+                    cur.rgb = tcs_read(P,col); cur.t_read = t; state = 4;
+                end
+            case 4                                                     % S4 décision + calcul du délai
+                [cc,score] = tcs_classify(cur.rgb);
+                v_meas = v_lin(P,n_meas_f(k));
+                cur.cat = cc; cur.score = score; cur.v_meas = v_meas;
+                if v_meas > 1e-3
+                    cur.dt_calc = P.D_CAPT/v_meas;                    % dt = d / v
+                    cur.t_act = cur.t_det + cur.dt_calc - P.T_AVANCE;
+                    cur.t_rel = cur.t_det + cur.dt_calc + P.L_PIECE/v_meas + P.T_MARGE;
+                    state = 5;
+                else
+                    cur.dt_calc = NaN; cur.t_act_eff = t; cur.t_rel = t; state = 7;
+                end
+            case 5                                                     % S5 délai de déplacement
+                if t >= cur.t_act
+                    if cur.cat == 0, cmd = P.THETA_A; else, cmd = P.THETA_B; end
+                    cur.t_act_eff = t; state = 6;
+                end
+            case 6                                                     % S6 actuation
+                if t >= cur.t_rel, cmd = P.THETA_N; state = 7; end
+            case 7                                                     % S7 comptage / retour au neutre
+                if abs(theta-P.THETA_N) < 0.5
+                    count(cur.cat+1) = count(cur.cat+1)+1;
+                    cur.t_end = t; cycle_max = max(cycle_max,t-cur.t_det);
+                    ev{end+1} = cur; cur = struct(); state = 1; %#ok<AGROW>
+                end
+        end
+        log_state(k) = state; log_theta(k) = theta; log_cmd(k) = cmd;
+    end
+    % --- évaluation (vérité terrain) ---
+    det = zeros(Np,1);
+    for j = 1:numel(ev), det(ev{j}.piece_sensor) = j; end
+    piece = (1:Np)'; couleur = cell(Np,1); t_det = nan(Np,1); Rr = t_det; Gg = t_det; Bb = t_det; score = t_det;
+    decide = cell(Np,1); vm = t_det; dtc = t_det; dtr = t_det; errms = t_det; bac_s = cell(Np,1); okv = false(Np,1);
+    for k = 1:Np
+        mk = (t_f>=t_v_on(k)) & (t_f<=t_v_off(k)); th = log_theta(mk);
+        if ~isempty(th) && all(abs(th-P.THETA_A) < P.THETA_TOL), bac = 0;
+        elseif ~isempty(th) && all(abs(th-P.THETA_B) < P.THETA_TOL), bac = 1;
+        else, bac = -1; end
+        couleur{k} = names{idx_col(k)};
+        if det(k) > 0
+            e = ev{det(k)};
+            t_det(k) = e.t_det; Rr(k) = e.rgb(1); Gg(k) = e.rgb(2); Bb(k) = e.rgb(3); score(k) = e.score;
+            if e.cat == 0, decide{k} = 'rouge (bac 1)'; else, decide{k} = 'bleue (bac 2)'; end
+            vm(k) = e.v_meas; dtc(k) = e.dt_calc; dtr(k) = t_v_on(k)-e.t_det;
+            errms(k) = (e.t_det+e.dt_calc-t_v_on(k))*1e3;
+            okv(k) = (bac == cat_true(k));
+        else
+            decide{k} = 'non détectée';
+        end
+        if bac == 0, bac_s{k} = 'bac 1'; elseif bac == 1, bac_s{k} = 'bac 2'; else, bac_s{k} = 'volet mal positionné'; end
+    end
+    R.df = table(piece,couleur,t_inj,t_det,Rr,Gg,Bb,score,decide,vm,dtc,dtr,errms,bac_s,okv, ...
+        'VariableNames',{'piece','couleur_reelle','t_injection_s','t_detection_s','R','G','B','indice_chromatique', ...
+        'categorie_decidee','v_mesuree_m_s','delta_t_calcule_s','delta_t_reel_s','erreur_timing_ms','bac_obtenu','tri_correct'});
+    R.t_f = t_f; R.theta = log_theta; R.cmd = log_cmd; R.state = log_state; R.s = s; R.s0 = s0;
+    R.t_inj = t_inj; R.t_v_on = t_v_on; R.t_v_off = t_v_off; R.events = ev; R.count = count;
+    R.cat_true = cat_true; R.cycle_max = cycle_max; R.gaps = diff(t_inj); R.trace = trace;
+end
+
+function plot_tri(P,R,figdir,name,full)
+    df = R.df; t_f = R.t_f; Np = P.N_PIECES;
+    if full
+        t0 = 0; t1 = max(R.t_v_off)+4; h = 8.6;
+    else
+        t0 = R.t_inj(1)-1; t1 = R.t_v_off(3)+2; h = 8.6;
+    end
+    f = newfig(h);
+    colr = {[0.84 0.15 0.16],[0.12 0.47 0.71]};    % rouge, bleu
+    nev = numel(R.events);
+    % (a) déplacement des pièces
+    a1 = subplot(5,1,1); hold on;
+    for k = 1:Np
+        ts = linspace(R.t_inj(k),min(R.t_v_off(k)+1,t_f(end)),300);
+        x = interp1(t_f,R.s,ts)-R.s0(k);
+        plot(ts,x,'Color',colr{R.cat_true(k)+1},'LineWidth',1.0);
+        if df.tri_correct(k), plot(R.t_v_on(k),P.X_VOLET,'o','MarkerFaceColor',[0 .5 0],'MarkerEdgeColor',[0 .5 0],'MarkerSize',4);
+        else, plot(R.t_v_on(k),P.X_VOLET,'kx','MarkerSize',7,'LineWidth',2); end
+        if ~isnan(df.t_detection_s(k)), plot(df.t_detection_s(k),P.X_IR,'^','MarkerFaceColor',[0.49 0.18 0.56],'MarkerEdgeColor','none','MarkerSize',4); end
+    end
+    plot([t0 t1],[P.X_IR P.X_IR],':','Color',[0.49 0.18 0.56],'LineWidth',0.9);
+    plot([t0 t1],[P.X_VOLET P.X_VOLET],':','Color',[.5 .5 .5],'LineWidth',0.9);
+    text(t0+0.01*(t1-t0),P.X_IR-0.04,'capteurs IR + couleur','FontSize',7,'Color',[0.49 0.18 0.56]);
+    text(t0+0.01*(t1-t0),P.X_VOLET-0.04,'volet de tri','FontSize',7,'Color',[.4 .4 .4]);
+    if full
+        ylim([-0.04 0.80]);
+        text(t1-0.5,0.20,sprintf('Espacement mini mesuré = %.2f s  (CdC : >= %d s)',min(R.gaps),P.T_MIN_PIECES), ...
+            'HorizontalAlignment','right','FontSize',7,'Color',[0.49 0.18 0.56],'BackgroundColor','w','EdgeColor',[0.49 0.18 0.56]);
+        ttl = sprintf('Simulation 6 - Tri automatique de %d pièces',Np);
+    else
+        ylim([-0.04 1.32]);
+        d0 = df.t_detection_s(1); d1 = df.t_detection_s(2);
+        plot([d0 d1],[0.80 0.80],'-','Color',[0.49 0.18 0.56]); plot(d0,0.8,'<','Color',[0.49 0.18 0.56],'MarkerFaceColor',[0.49 0.18 0.56],'MarkerSize',4);
+        plot(d1,0.8,'>','Color',[0.49 0.18 0.56],'MarkerFaceColor',[0.49 0.18 0.56],'MarkerSize',4);
+        text((d0+d1)/2,0.85,sprintf('%.2f s >= %d s [CdC]',d1-d0,P.T_MIN_PIECES),'HorizontalAlignment','center','FontSize',7,'Color',[0.49 0.18 0.56]);
+        plot([d0 R.t_v_on(1)],[0.66 0.66],'-','Color',[.4 .4 .4]); plot(d0,0.66,'<','Color',[.4 .4 .4],'MarkerFaceColor',[.4 .4 .4],'MarkerSize',4);
+        plot(R.t_v_on(1),0.66,'>','Color',[.4 .4 .4],'MarkerFaceColor',[.4 .4 .4],'MarkerSize',4);
+        text((d0+R.t_v_on(1))/2,0.71,sprintf('\\Deltat = d/v = %.2f s [CdC]',df.delta_t_calcule_s(1)),'HorizontalAlignment','center','FontSize',7,'Color',[.4 .4 .4]);
+        ttl = sprintf('Simulation 6 - Tri automatique de %d pièces (zoom sur les 3 premières)',Np);
+    end
+    h1 = plot(NaN,NaN,'-','Color',colr{1}); h2 = plot(NaN,NaN,'-','Color',colr{2});
+    h3 = plot(NaN,NaN,'^','MarkerFaceColor',[0.49 0.18 0.56],'MarkerEdgeColor','none');
+    h4 = plot(NaN,NaN,'o','MarkerFaceColor',[0 .5 0],'MarkerEdgeColor',[0 .5 0]); h5 = plot(NaN,NaN,'kx','LineWidth',2);
+    legend([h1 h2 h3 h4 h5],{'pièce rouge','pièce bleue','détection IR','arrivée au volet : tri correct','arrivée au volet : tri incorrect'}, ...
+        'Location','north','NumColumns',3,'FontSize',6.5);
+    title(ttl); ylabel('Position bord avant (m)'); xlim([t0 t1]);
+    % (b) détection couleur
+    a2 = subplot(5,1,2); hold on;
+    for j = 1:nev
+        e = R.events{j}; plot(e.t_read,e.score,'s','MarkerFaceColor',colr{e.cat+1},'MarkerEdgeColor','none','MarkerSize',4);
+    end
+    plot([t0 t1],[0 0],'k','LineWidth',0.8); ylim([-0.75 0.75]); ylabel('Indice (R-B)/(R+G+B)'); xlim([t0 t1]);
+    g1 = plot(NaN,NaN,'s','MarkerFaceColor',colr{1},'MarkerEdgeColor','none'); g2 = plot(NaN,NaN,'s','MarkerFaceColor',colr{2},'MarkerEdgeColor','none');
+    legend([g1 g2],{'décision : rouge','décision : bleu'},'Location','east','FontSize',6.5);
+    % (c) servomoteur
+    a3 = subplot(5,1,3); hold on; ylim([55 125]);
+    for j = 1:nev
+        e = R.events{j};
+        patch([e.t_act_eff e.t_rel e.t_rel e.t_act_eff],[55 55 125 125],colr{e.cat+1},'FaceAlpha',0.15,'EdgeColor','none');
+    end
+    c1 = plot(t_f,R.cmd,'--','Color',[.5 .5 .5],'LineWidth',1); c2 = plot(t_f,R.theta,'Color',P.C_CMD);
+    ylabel('Angle servo (deg)'); xlim([t0 t1]); legend([c1 c2],{'commande','position du volet'},'Location','northeast','FontSize',6.5);
+    % (d) résultat par pièce
+    a4 = subplot(5,1,4); hold on; ylim([0 1]); set(a4,'YTick',[]);
+    if full, w = 0.5; else, w = 0.15; end
+    for k = 1:Np
+        if df.tri_correct(k), cl = [0 .6 0]; else, cl = [0 0 0]; end
+        patch(R.t_v_on(k)+[-w w w -w]/2,[0 0 1 1],cl,'FaceAlpha',0.7,'EdgeColor','none');
+    end
+    text(t0+0.02*(t1-t0),0.5,sprintf('Taux de tri correct = %.0f %%   (CdC : >= %d %%)',R.taux,P.TAUX_MIN),'FontSize',8, ...
+        'BackgroundColor','w','EdgeColor',[0 .6 0]);
+    ylabel('Résultat'); xlim([t0 t1]);
+    % (e) état FSM
+    a5 = subplot(5,1,5); stairs(t_f,R.state,'Color',[0.55 0.35 0.2],'LineWidth',1.0);
+    set(a5,'YTick',0:7); ylim([-0.3 7.3]); xlim([t0 t1]); xlabel('Temps (s)');
+    if full
+        set(a5,'YTickLabel',{'S0','S1','S2','S3','S4','S5','S6','S7'});
+    else
+        set(a5,'YTickLabel',{'S0 Init','S1 Wait','S2 Pièce détectée','S3 Lecture couleur','S4 Décision','S5 Délai','S6 Actuation','S7 Comptage/Retour'},'FontSize',6);
+    end
+    ylabel('État FSM');
+    linkaxes([a1 a2 a3 a4 a5],'x');
+    foot(f,sprintf(['[CdC] 20 pièces ; >= 5 s entre pièces ; Δt = d/v ; taux de tri >= 90 %% ; vitesse 40 tr/min ; +20 %% de couple à t = %.0f s.   ' ...
+        '[HYP] d, longueur des pièces, couleurs/bruit TCS34725, SG90.'],P.T_PERT_TRI));
+    pl_save(f,figdir,name);
+end
+
+function f = newfig(h)
+    f = figure('Units','inches','Position',[1 1 6.3 h],'Color','w','PaperPositionMode','auto');
+end
+
+function foot(f,txt)
+% Note de bas de figure : provenance des valeurs ([CdC] = cahier des charges, [HYP] = hypothèse)
+    ax = findall(f,'Type','axes');
+    for a = ax'
+        p = get(a,'Position'); p(2) = 0.085+p(2)*0.915; p(4) = p(4)*0.915; set(a,'Position',p);
+    end
+    annotation(f,'textbox',[0.01 0.0 0.98 0.07],'String',txt,'EdgeColor','none','FontSize',6.5, ...
+        'Color',[.3 .3 .3],'VerticalAlignment','bottom','FitBoxToText','off');
+end
+
+
+function pl_save(f,figdir,name)
+% Garder la figure ouverte après le Run
+set(f,'PaperPositionMode','auto');
+
+% Sauvegarde PNG haute qualité (300 DPI)
+print(f,fullfile(figdir,name),'-dpng','-r300');
+
+% Sauvegarde MATLAB pour réouverture ultérieure
+[~,base,~] = fileparts(name);
+savefig(f,fullfile(figdir,[base '.fig']));
+
+% Ne pas fermer la figure !
+fprintf('   [figure PNG + FIG] figures/%s\n',base);
+end
+
+
+function s = verdict(ok)
+    if ok, s = 'conforme'; else, s = 'NON conforme'; end
+end
+
+function s = verdict_opt(lim,val)
+    if isempty(lim), s = 'n/a'; else, s = verdict(val <= lim); end
+end
+
+function s = spec_txt(lim,unit)
+    if isempty(lim), s = 'non communiqué'; else, s = sprintf('<= %g %s',lim,unit); end
+end
