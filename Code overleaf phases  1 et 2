@@ -1,0 +1,1062 @@
+\documentclass[12pt,a4paper,oneside]{report}
+
+% ==================== PACKAGES ====================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[a4paper,left=2.3cm,right=2.3cm,top=2.2cm,bottom=2cm,headheight=16pt]{geometry}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{calc,arrows.meta,positioning,shapes.geometric,shadows}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{enumitem}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{float}
+\usepackage{lastpage}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{attachfile2}
+
+
+\usepackage[
+    colorlinks=true,
+    citecolor=blue,
+    urlcolor=blue,
+    linkcolor=blue
+]{hyperref}
+
+% ==================== PALETTE ====================
+\definecolor{Navy}{HTML}{0F2C59}
+\definecolor{DeepSky}{HTML}{00A9FF}
+\definecolor{Orange}{HTML}{FF6B00}
+\definecolor{SoftOrange}{HTML}{FFD9C0}
+\definecolor{LightBlue}{HTML}{F0F8FF}
+\definecolor{GrayText}{HTML}{4A5568}
+\definecolor{DarkGray}{HTML}{2D3748}
+\definecolor{Cyan}{HTML}{00A9FF}
+\definecolor{Blue}{HTML}{1E6FD9}
+\colorlet{enetblue}{Navy}
+\colorlet{sunorange}{Orange}
+
+% ==================== DOCUMENT SETTINGS ====================
+\setstretch{1.1}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=Orange,
+    urlcolor=DeepSky,
+    citecolor=Navy,
+    pdftitle={Ligne de tri automatique par couleur},
+    pdfauthor={Équipe Sujet 22}
+}
+
+% ==================== MACROS DE LA PAGE DE GARDE ====================
+\newcommand{\g}[1]{\vspace{#1}}
+\newcommand{\bleu}[1]{\textcolor{enetblue}{#1}}
+\newcommand{\lb}[2]{{\color{enetblue}\rule{#1}{#2}}}
+\newcommand{\lo}[2]{{\color{sunorange}\rule{#1}{#2}}}
+\newcommand{\tailletitre}{\LARGE}
+\newcommand{\logo}{%
+  \IfFileExists{logo.png.png}%
+  {\includegraphics[width=5cm]{logo.png.png}}%
+  {\fbox{\parbox[c][2.1cm][c]{5cm}{\centering\small ENET'Com}}}}
+
+% ==================== HEADER AND FOOTER ====================
+\pagestyle{fancy}
+\fancyhf{}
+
+\fancyhead[L]{\small\textcolor{Navy}{\textbf{ENET'Com} | Génie Informatique Industrielle (1GII)}}
+\fancyhead[R]{\small\textcolor{GrayText}{Sujet 22 -- Phases 1 et 2}}
+
+\fancyfoot[L]{\small\textcolor{GrayText}{Ligne de tri automatique par couleur}}
+\fancyfoot[R]{\small\textcolor{Orange}{\bfseries\thepage\ /\ \pageref{LastPage}}}
+
+\renewcommand{\headrulewidth}{0.8pt}
+\renewcommand{\headrule}{
+\hbox to\headwidth{\color{Orange}
+\leaders\hrule height \headrulewidth\hfill}}
+
+% Même style pour les pages d'ouverture des chapitres
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyhead[L]{\small\textcolor{Navy}{\textbf{ENET'Com} | Génie Informatique Industrielle (1GII)}}
+  \fancyhead[R]{\small\textcolor{GrayText}{Sujet 22 -- Phases 1 et 2}}
+  \fancyfoot[L]{\small\textcolor{GrayText}{Ligne de tri automatique par couleur}}
+  \fancyfoot[R]{\small\textcolor{Orange}{\bfseries\thepage\ /\ \pageref{LastPage}}}
+  \renewcommand{\headrulewidth}{0.8pt}
+  \renewcommand{\headrule}{\hbox to\headwidth{\color{Orange}\leaders\hrule height \headrulewidth\hfill}}
+}
+
+% ==================== CHAPTER & SECTION STYLES ====================
+\titleformat{\chapter}[display]
+{\normalfont\bfseries\color{Navy}}
+{\filleft
+\small\color{Orange}\MakeUppercase{Chapitre}
+\hspace{0.4cm}
+\tikz[baseline=-0.5ex]
+\node[fill=Orange,text=white,circle,inner sep=5pt,font=\bfseries\Large]{\thechapter};}
+{0.5ex}
+{\Huge\bfseries\vspace*{-0.9cm}}
+[\vspace{0.5ex}\color{DeepSky}\titlerule]
+
+\titleformat{\section}
+{\Large\bfseries\color{Navy}}
+{\color{Orange}\thesection\quad}
+{0pt}
+{}
+[\color{DeepSky}\rule{0.35\linewidth}{1.5pt}]
+
+\titleformat{\subsection}
+{\large\bfseries\color{DeepSky}}
+{\thesubsection\quad}
+{0pt}
+{}
+
+% ==================== CUSTOM BOXES ====================
+\newtcolorbox{infobox}[1]{
+    enhanced,
+    breakable,
+    colback=SoftOrange!30,
+    colframe=Orange,
+    boxrule=0.8pt,
+    arc=2mm,
+    title=\textbf{\color{white}#1},
+    coltitle=white,
+    colbacktitle=Orange,
+    left=4mm,
+    right=4mm,
+    top=3mm,
+    bottom=3mm,
+    drop shadow=black!10
+}
+
+\newtcolorbox{goalbox}[1]{
+    enhanced,
+    breakable,
+    colback=LightBlue,
+    colframe=Navy,
+    arc=2mm,
+    boxrule=0.8pt,
+    title=\textbf{#1},
+    coltitle=white,
+    colbacktitle=Navy,
+    left=4mm,
+    right=4mm,
+    top=3mm,
+    bottom=3mm
+}
+
+% ==================== DOCUMENT ====================
+\begin{document}
+
+% ==================================================
+% PAGE DE GARDE
+% ==================================================
+\begin{titlepage}
+\thispagestyle{empty}
+\begingroup
+\setstretch{1}
+\setlength{\parskip}{0pt}
+\begin{center}
+
+\begin{minipage}[t]{0.32\textwidth}
+  \centering\scriptsize
+  République Tunisienne\\
+  Ministère de l'Enseignement Supérieur\\
+  et de la Recherche Scientifique\\[3pt]
+  \lb{2cm}{0.4pt}\\[-1pt]\lb{2cm}{0.4pt}\\[3pt]
+  Université de Sfax\\[3pt]
+  \lb{2cm}{0.4pt}\\[-1pt]\lb{2cm}{0.4pt}\\[3pt]
+  École nationale d'électronique\\
+  et des télécommunications de Sfax
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering\g{0pt}
+  \logo
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering\scriptsize\g{1.4cm}
+  \textbf{\bleu{Ingénieur en :}}\\
+  Génie Informatique Industriel
+\end{minipage}
+
+\g{4pt}
+\lb{\textwidth}{1.6pt}\\[-5pt]
+\lo{\textwidth}{0.6pt}
+
+\g{1.2cm}
+{\fontsize{42}{46}\selectfont\bfseries\bleu{MINI PROJET}}\\[4pt]
+\lb{0.7\textwidth}{1.8pt}\\[-7pt]
+\lo{0.7\textwidth}{0.8pt}
+
+\g{1.2cm}
+{\large\bfseries\itshape\bleu{Présenté à}}
+
+\g{0.3cm}
+{\Large\bfseries L'École Nationale d'Électronique et des\\
+Télécommunications de Sfax}
+
+\g{1.2cm}
+{\bfseries\itshape\bleu{Par}}
+
+\g{0.2cm}
+{\Large\bfseries Ayman Feki, Ismail Abaoub, Karim Boudaya
+}
+
+\g{0.4cm}
+{\normalsize Encadrante : Dr-Ing Ferdaous Masmoudi}
+
+\g{1.2cm}
+\lb{0.8\textwidth}{0.8pt}\\[8pt]
+{\tailletitre\bfseries\bleu{Ligne de tri automatique par couleur}}\\[2pt]
+\lo{0.8\textwidth}{2.5pt}
+
+
+\g{0.3cm}
+{\large Rendu 1 : Phases 1 et 2}
+
+% Illustration du convoyeur
+\begin{center}
+\begin{tikzpicture}[scale=1.05, every node/.style={transform shape}]
+    % Convoyeur
+    \fill[DarkGray] (-2,-0.35) rectangle (3,0);
+    \fill[Navy] (-2,-0.15) rectangle (3,0.05);
+    \draw[thick,Orange] (-2,-0.35) -- (3,-0.35);
+
+    % Rouleaux
+    \fill[GrayText] (-1.8,-0.2) circle (0.18);
+    \fill[GrayText] (2.8,-0.2) circle (0.18);
+
+    % Pièces
+    \fill[Orange] (-1.1,0.05) rectangle (-0.65,0.5);
+    \fill[DeepSky] (0.1,0.05) rectangle (0.55,0.5);
+    \fill[Orange] (1.3,0.05) rectangle (1.75,0.5);
+
+    % Capteur
+    \draw[very thick,Navy] (0.3,1.5) -- (0.3,0.8);
+    \fill[DeepSky] (0.1,1.45) rectangle (0.5,1.7);
+    \node[above,font=\scriptsize,color=Navy] at (0.3,1.7) {Capteur};
+
+    % Volet et servo
+    \fill[Navy] (2.3,0) rectangle (2.5,0.8);
+    \draw[thick,Orange] (2.4,0.8) -- (2.9,1.3);
+    \fill[Orange] (2.9,1.3) circle (0.12);
+    \node[right,font=\scriptsize,color=Navy] at (2.9,1.3) {Volet};
+
+    % Sens de déplacement
+    \draw[-{Stealth[length=3mm]},thick,DeepSky] (-1.8,0.9) -- (1.8,0.9);
+    \node[above,font=\scriptsize,color=DeepSky] at (0,0.9) {Sens de déplacement};
+\end{tikzpicture}
+\end{center}
+
+\vfill
+\g{0.3cm}
+\lb{3cm}{0.8pt}\\[6pt]
+{\large\bfseries\bleu{Année universitaire 2026/2027}}
+\end{center}
+\endgroup
+\end{titlepage}
+
+
+% TABLE OF CONTENTS
+% ==================================================
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+% ==================================================
+% PHASE 1
+% ==================================================
+\chapter{Présentation du projet et cahier des charges}
+
+\begin{infobox}{Objectif de cette phase}
+Présenter le système de tri automatique par couleur, définir le besoin auquel il répond et identifier les exigences principales avant la modélisation.
+\end{infobox}
+
+% ==================== INTRODUCTION ====================
+\section{Introduction}
+
+Dans le cadre du mini-projet d'automatique, nous proposons l'étude d'une ligne de tri automatique par couleur.
+
+Ce système permet de détecter la couleur des pièces transportées sur un convoyeur, puis de les orienter automatiquement vers des bacs de destination différents.
+
+Le projet associe deux fonctions principales : la régulation de la vitesse du convoyeur et la commande séquentielle du mécanisme de tri.
+
+L'objectif est de concevoir une solution fiable permettant de maintenir une vitesse de transport stable et d'assurer un tri correct malgré les variations de charge.
+
+% ==================== PRESENTATION ====================
+\section{Présentation du sujet}
+
+Le système étudié est constitué d'un convoyeur entraîné par un moteur à courant continu (DC motor).
+
+Les pièces sont transportées jusqu'à une zone de détection où une cellule infrarouge détecte leur présence. Un capteur de couleur TCS34725 mesure ensuite les composantes rouge, verte et bleue de la pièce.
+
+Un ESP32 traite les informations reçues, identifie la couleur et commande un servomoteur qui positionne un volet afin d'orienter la pièce vers le bac correspondant.
+
+\begin{goalbox}{Idée essentielle}
+Le système doit détecter la couleur de chaque pièce, calculer son temps de déplacement jusqu'au volet et commander correctement le mécanisme de déviation.
+\end{goalbox}
+
+% ==================== PROBLEM ====================
+\section{Problématique}
+
+Dans les systèmes industriels, le tri manuel des pièces selon leur couleur nécessite du temps et une intervention humaine continue. Cette méthode peut entraîner des erreurs de classification, ralentir la production et réduire l’efficacité du processus industriel. 
+
+Par ailleurs, le fonctionnement d’une ligne de tri automatisée dépend fortement de la stabilité de la vitesse du convoyeur. En effet, les variations de vitesse causées par les changements de charge ou l’augmentation des frottements peuvent modifier le temps de déplacement des pièces vers les postes de tri. Une mauvaise synchronisation entre la détection de la couleur et l’activation du mécanisme de déviation risque alors de provoquer des erreurs de tri.  
+
+\begin{infobox}{Problématique}
+Comment maintenir une vitesse stable du convoyeur malgré les perturbations mécaniques et synchroniser correctement la détection de couleur avec l'actionnement du mécanisme de tri ?
+\end{infobox}
+
+Pour répondre à cette problématique, nous proposons une régulation en boucle fermée de la vitesse du moteur, associée à une commande séquentielle indépendante du processus de tri.
+
+% ==================== OBJECTIVES ====================
+\section{Objectifs du projet}
+
+Les objectifs principaux de ce projet sont :
+
+\begin{itemize}[label=\textcolor{Cyan}{$\bullet$}]
+    \item Maintenir la vitesse du convoyeur autour de sa valeur de référence.
+    \item Réduire l'erreur statique de vitesse.
+    \item Limiter le dépassement lors des changements de consigne.
+    \item Garantir un taux de tri satisfaisant même en présence de perturbations.
+\end{itemize}
+\clearpage
+% ==================== SPECIFICATIONS ====================
+\section{Cahier des charges}
+
+\subsection{Fonction principale}
+
+La fonction principale est de trier automatiquement des pièces selon leurs couleurs vers des bacs correspondants.
+
+
+\subsection{Éléments fonctionnels}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|p{3.5cm}|p{8.5cm}|}
+\hline
+\rowcolor{Navy}
+\color{white}\textbf{Élément} & \color{white}\textbf{Fonction} \\
+\hline
+ESP32 & Traitement des informations et commande générale. \\
+\hline
+Moteur DC & Entraînement du convoyeur. \\
+\hline
+Codeur incrémental & Mesure de la vitesse réelle du moteur. \\
+\hline
+Cellule infrarouge & Détection de la présence d'une pièce. \\
+\hline
+Capteur TCS34725 & Mesure des composantes de couleur R, G, B et C. \\
+\hline
+Pont en H & Commande de puissance du moteur par PWM. \\
+\hline
+Servomoteur & Positionnement du volet de déviation. \\
+\hline
+Convoyeur & Transport des pièces vers la zone de tri. \\
+\hline
+\end{tabular}
+\caption{Éléments fonctionnels du système}
+\end{table}
+
+\subsection{Entrée, sortie et variables principales}
+
+Les principales variables du système sont :
+
+\begin{itemize}[label=\textcolor{Cyan}{$\bullet$}]
+    \item \textbf{Consigne :} $\omega_c$, vitesse de référence du moteur.
+    \item \textbf{Sortie :} $\omega(t)$, vitesse réelle du moteur.
+    \item \textbf{Commande :} $u(t)$, rapport cyclique PWM appliqué au pont en H.
+    \item \textbf{Perturbation :} $d(t)$, couple résistant appliqué au moteur.
+    \item \textbf{Mesure :} $\omega_m$, vitesse mesurée par le codeur.
+    \item \textbf{Mesures couleur :} $R,G,B,C$, valeurs fournies par le TCS34725.
+    \item \textbf{Temporisation :} $\Delta t$, délai entre la détection et la déviation.
+\end{itemize}
+
+
+La commande du moteur est réalisée par modulation de largeur d'impulsion (PWM).
+
+Le délai de déplacement d'une pièce est calculé par :
+
+\[
+\Delta t=\frac{d}{v}
+\]
+
+où $d$ représente la distance entre le capteur de couleur et le volet, et $v$ la vitesse linéaire du convoyeur.
+\subsection{Contraintes et critères de performance}
+
+Le système devra répondre aux critères suivants :
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|p{2cm}|p{7cm}|p{3cm}|}
+\hline
+\rowcolor{Navy}
+\color{white}\textbf{Code} &
+\color{white}\textbf{Exigence} &
+\color{white}\textbf{Valeur cible} \\
+\hline
+CDC-1 & Vitesse nominale du convoyeur & 40 tr/min \\
+\hline
+CDC-2 & Erreur statique de vitesse & $<2$ tr/min \\
+\hline
+CDC-3 & Dépassement maximal & $\leq 10\%$ \\
+\hline
+CDC-4 & Nombre de pièces du test & 20 pièces \\
+\hline
+CDC-5 & Taux de tri correct & $\geq 90\%$ \\
+\hline
+CDC-6 & Perturbation du couple résistant & $+20\%$ \\
+\hline
+\end{tabular}
+\caption{Critères de performance du cahier des charges}
+\end{table}
+
+Les critères CDC-2 et CDC-5 doivent rester satisfaits lors de l'application de la perturbation CDC-6.
+
+\begin{goalbox}{Critère de réussite}
+Le système est considéré comme satisfaisant si au moins 18 pièces sur 20 sont correctement triées et si l'erreur statique de vitesse reste inférieure à 2 tr/min.
+\end{goalbox}
+% ==================== FUNCTIONAL ARCHITECTURE ====================
+\section{Architecture fonctionnelle}
+
+Le fonctionnement global du système est organisé autour de deux fonctions complémentaires.
+
+\subsection{Fonction A : Régulation de vitesse}
+
+Cette fonction assure le maintien de la vitesse du convoyeur.
+
+Un codeur incrémental mesure la vitesse réelle du moteur. Cette mesure est comparée à la consigne. Un correcteur calcule ensuite la commande PWM envoyée au pont en H.
+
+Le système prévoit une saturation de la commande et un mécanisme anti-windup afin de limiter les effets de l'accumulation de l'action intégrale.
+
+\subsection{Fonction B : Commande séquentielle du tri}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc}
+
+\begin{document}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    scale=0.78, transform shape, % <--- تقليل الحجم العام للمخطط
+    node distance=0.85cm,          % <--- تقليل المسافة بين العناصر
+    % Style des étapes normatives
+    stepbox/.style={draw, thick, minimum size=0.8cm, inner sep=0pt, font=\bfseries},
+    % Style des actions (rectangles d'action)
+    actionbox/.style={draw, rectangle, minimum height=0.7cm, inner xsep=6pt, align=left, font=\small},
+    % Style des flèches
+    arrow/.style={-{Stealth[length=2mm]}, thick}
+]
+
+    % --- ÉTAPES ET RÉCEPTIVITÉS ---
+    
+    % Étape initiale S0 (Double carré parfait)
+    \node[stepbox] (E0) {S0};
+    \node[draw, thick, minimum size=1.0cm, inner sep=0pt] (E0_outer) at (E0) {};
+    \node[right=0.3cm of E0_outer, font=\small] {Système initialisé / Prêt};
+
+    % Transition S1 & Étape S1
+    \node[below=0.45cm of E0_outer] (T1) {};
+    \draw[thick] ($(T1)+(-0.2,0)$) -- ($(T1)+(0.2,0)$) node[right=3pt] {$S_1$};
+    \node[stepbox, below=0.45cm of T1] (E1) {S1};
+
+    % Transition S2 & Étape S2
+    \node[below=0.45cm of E1] (T2) {};
+    \draw[thick] ($(T2)+(-0.2,0)$) -- ($(T2)+(0.2,0)$) node[right=3pt] {$S_2$};
+    \node[stepbox, below=0.45cm of T2] (E2) {S2};
+
+    % Transition S3 & Étape S3
+    \node[below=0.45cm of E2] (T3) {};
+    \draw[thick] ($(T3)+(-0.2,0)$) -- ($(T3)+(0.2,0)$) node[right=3pt] {$S_3$};
+    \node[stepbox, below=0.45cm of T3] (E3) {S3};
+
+    % Transition S4 & Étape S4
+    \node[below=0.45cm of E3] (T4) {};
+    \draw[thick] ($(T4)+(-0.2,0)$) -- ($(T4)+(0.2,0)$) node[right=3pt] {$S_4$};
+    \node[stepbox, below=0.45cm of T4] (E4) {S4};
+
+    % Transition S5 & Étape S5
+    \node[below=0.45cm of E4] (T5) {};
+    \draw[thick] ($(T5)+(-0.2,0)$) -- ($(T5)+(0.2,0)$) node[right=3pt] {$S_5$};
+    \node[stepbox, below=0.45cm of T5] (E5) {S5};
+
+    % Transition S6 & Étape S6
+    \node[below=0.45cm of E5] (T6) {};
+    \draw[thick] ($(T6)+(-0.2,0)$) -- ($(T6)+(0.2,0)$) node[right=3pt] {$S_6$};
+    \node[stepbox, below=0.45cm of T6] (E6) {S6};
+
+    % Transition S7 & Étape S7
+    \node[below=0.45cm of E6] (T7) {};
+    \draw[thick] ($(T7)+(-0.2,0)$) -- ($(T7)+(0.2,0)$) node[right=3pt] {$S_7$};
+    \node[stepbox, below=0.45cm of T7] (E7) {S7};
+
+    % --- LIAISONS VERTICALES PRINCIPALES ---
+    \draw[thick] (E0_outer.south) -- (T1); 
+    \draw[thick] (T1) -- (E1);
+    \draw[thick] (E1) -- (T2); \draw[thick] (T2) -- (E2);
+    \draw[thick] (E2) -- (T3); \draw[thick] (T3) -- (E3);
+    \draw[thick] (E3) -- (T4); \draw[thick] (T4) -- (E4);
+    \draw[thick] (E4) -- (T5); \draw[thick] (T5) -- (E5);
+    \draw[thick] (E5) -- (T6); \draw[thick] (T6) -- (E6);
+    \draw[thick] (E6) -- (T7); \draw[thick] (T7) -- (E7);
+
+    % --- ACTIONS ASSOCIÉES ---
+    
+    % Action S1
+    \node[actionbox, right=0.5cm of E1, anchor=west] (A1) {\textbf{WAIT} : attente du front montant de la cellule infrarouge};
+    \draw[arrow] (E1.east) -- (A1.west);
+
+    % Action S2
+    \node[actionbox, right=0.5cm of E2, anchor=west] (A2) {\textbf{PIECE DETECTED} : détection et positionnement de la pièce sous le capteur};
+    \draw[arrow] (E2.east) -- (A2.west);
+
+    % Action S3
+    \node[actionbox, right=0.5cm of E3, anchor=west] (A3) {\textbf{COLOR READING} : acquisition des composantes R, G, B, C};
+    \draw[arrow] (E3.east) -- (A3.west);
+
+    % Action S4
+    \node[actionbox, right=0.5cm of E4, anchor=west] (A4) {\textbf{DECISION} : comparaison des seuils et identification de la couleur A ou B};
+    \draw[arrow] (E4.east) -- (A4.west);
+
+    % Action S5
+    \node[actionbox, right=0.5cm of E5, anchor=west] (A5) {\textbf{DELAY} : attente du délai $\Delta t = d/v$};
+    \draw[arrow] (E5.east) -- (A5.west);
+
+    % Action S6
+    \node[actionbox, right=0.5cm of E6, anchor=west] (A6) {\textbf{ACTUATION} : commande du servomoteur vers la position A ou B};
+    \draw[arrow] (E6.east) -- (A6.west);
+
+    % Action S7
+    \node[actionbox, right=0.5cm of E7, anchor=west] (A7) {\textbf{COUNT/RETURN} : comptage, retour du volet en position neutre et retour à S1};
+    \draw[arrow] (E7.east) -- (A7.west);
+
+    % --- BOUCLES DE RETOUR ET LIAISONS ---
+    
+    % Ligne de sortie sous l'étape S7
+    \draw[thick] (E7.south) -- ++(0,-0.5) coordinate (bot);
+    \draw[arrow] (bot) -- ++(0.4,0);
+    
+    % Ligne verticale de retour propre à gauche vers S0
+    \draw[thick] (bot) -- ++(-1.4,0) coordinate (corner_left) -- (corner_left |- E0_outer.north) -- ++(0,0.4) -| (E0_outer.north);
+    
+    % Flèche remontante sur le fil vertical de gauche
+    \draw[arrow] ($(corner_left)+(0,5.8)$) -- ++(0,0.15); 
+
+\end{tikzpicture}
+\caption{Graphe séquentiel de la ligne de tri automatique par couleur }
+\label{fig:grafcet_sujet22}
+\end{figure}
+La vitesse fournie par la fonction A constitue le lien principal entre la régulation et la commande séquentielle, car elle permet de calculer le délai de déplacement.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+node distance=0.8cm and 0.7cm,
+block/.style={
+draw=Blue,
+fill=LightBlue,
+rounded corners,
+minimum width=2.4cm,
+minimum height=0.9cm,
+align=center,
+font=\small
+},
+arrow/.style={-{Stealth[length=2.5mm]},thick,color=Blue}
+]
+
+\node[block] (ref) {Consigne\\$\omega_c=40$ tr/min};
+\node[block,right=of ref] (pi) {Correcteur};
+\node[block,right=of pi] (motor) {Moteur DC\\+ Convoyeur};
+\node[block,below=of motor] (encoder) {Codeur incrémental};
+
+\draw[arrow] (ref)--(pi);
+\draw[arrow] (pi)--node[above,font=\scriptsize]{PWM}(motor);
+\draw[arrow] (motor)--(encoder);
+\draw[arrow] (encoder.west)-| (pi.south);
+
+\node[block,below=2.3cm of ref] (ir) {Cellule IR\\+ TCS34725};
+\node[block,right=of ir] (esp) {ESP32\\Décision et délai};
+\node[block,right=of esp] (servo) {Servomoteur\\+ Volet};
+
+\draw[arrow] (ir)--(esp);
+\draw[arrow] (esp)--(servo);
+
+\end{tikzpicture}
+\caption{Architecture fonctionnelle générale du système}
+\end{figure}
+\clearpage
+% ==================== PERFORMANCE ====================
+% ==================== TOOLS ====================
+\section{Outils envisagés}
+
+Les outils envisagés pour la réalisation et l'étude du projet sont :
+
+\begin{itemize}[label=\textcolor{Cyan}{$\bullet$}]
+    \item \textbf{ESP32 :} unité de traitement et de commande.
+    \item \textbf{Python / MATLAB :} modélisation et simulation du comportement du moteur et du correcteur.
+    \item \textbf{FreeCAD :} conception mécanique du convoyeur et du mécanisme de déviation.
+    \item \textbf{TCS34725 :} acquisition des informations de couleur.
+    \item \textbf{Overleaf :} rédaction et mise en forme du rapport.
+    \item \textbf{Zotero :} gestion des références bibliographiques.
+    \item \textbf{GitHub / Kanban :} organisation du code et suivi des tâches.
+\end{itemize}
+
+% ==================== CONCLUSION ====================
+\section{Conclusion de la phase 1}
+
+Cette première phase a permis de présenter le système de tri automatique par couleure et de définir ces objectifs toute en respectant la cahier de charge
+\chapter{Bibliographie et état de l'art}
+
+\begin{infobox}{Objectif de cette phase}
+Analyser les principes théoriques et les solutions techniques nécessaires à la conception du système de tri automatique, puis justifier les choix retenus pour la suite du projet.
+\end{infobox}
+
+% ==================== INTRODUCTION ====================
+\section{Introduction}
+Après avoir défini le besoin et le cahier des charges, il faut choisir une structure de commande adaptée.
+Cette phase s'appuie sur des documents de référence concernant la commande des moteurs à courant continu, les correcteurs, le capteur TCS34725 et les systèmes à événements discrets.
+L'objectif est de comparer les différentes stratégies possibles et de justifier le choix du correcteur.
+
+
+% ==================== DOCUMENTS ====================
+
+
+% ==================== SYNTHESIS ====================
+\section{Synthèse bibliographique}
+
+\subsection{Moteur DC}
+% Définition des couleurs exactes du tableau
+\definecolor{headerblue}{RGB}{12, 53, 106}      % Bleu foncé pour l'entête
+\definecolor{colblue}{RGB}{232, 240, 254}       % Bleu clair pour la 1ère colonne
+\definecolor{borderblue}{RGB}{12, 53, 106}      % Bleu pour les bordures
+\definecolor{captionblue}{RGB}{12, 53, 106}     % Bleu pour le texte de la légende
+
+\begin{document}
+
+\begin{table}[htbp]
+\centering
+\begin{tcolorbox}[
+    enhanced,
+    colframe=borderblue,
+    colback=white,
+    boxrule=1.2pt,
+    arc=0mm,
+    boxsep=0pt,
+    left=0pt,
+    right=0pt,
+    top=0pt,
+    bottom=0pt,
+    width=0.75\textwidth    % <--- 1. تصغير عرض الجدول (كانت 0.92)
+]
+\renewcommand{\arraystretch}{1.2} % <--- 2. تقليص الفراغ العمودي بين الأسطر (كانت 1.6)
+\setlength{\arrayrulewidth}{0.6pt}
+\arrayrulecolor{borderblue}
+
+\small % <--- 3. تصغير حجم الخط داخل الجدول (تنجم تستعمل زادة \footnotesize)
+
+\begin{tabularx}{\textwidth}{
+    |>{\columncolor{colblue}\bfseries\raggedright\arraybackslash}p{0.42\textwidth}
+    |>{\raggedright\arraybackslash}X|
+}
+\hline
+\rowcolor{headerblue}
+\multicolumn{1}{|c|}{\textcolor{white}{\large\bfseries Caractéristique}} & 
+\multicolumn{1}{c|}{\textcolor{white}{\large\bfseries Description}} \\ \hline
+
+Tension nominale & 12 V DC \\ \hline
+
+Vitesse nominale & 40 tr/min \\ \hline
+
+Rapport de réduction & 1/240 \\ \hline
+
+Couple nominal & 120 N·m \\ \hline
+
+Couple maximal & 180 N·m \\ \hline
+
+Courant nominal & 250 mA \\ \hline
+\end{tabularx}
+\end{tcolorbox}
+\caption{Caractéristiques du Moteur DC}
+\label{tab:moteur_dc_specs}
+\end{table}
+% --- Source en gris et en petit ---
+\definecolor{sourcegray}{RGB}{120, 120, 120}
+\vspace{-4pt} % للتعديل في المسافة العمودية
+{\color{sourcegray}\small\itshape Source : Datasheet officielle du Moteur DC \cite{moteur} }
+
+\subsection{Capteur de couleur TCS34725}
+
+
+% Définition des couleurs exactes du tableau
+\definecolor{headerblue}{RGB}{12, 53, 106}      % Bleu foncé pour l'entête
+\definecolor{colblue}{RGB}{232, 240, 254}       % Bleu clair pour la 1ère colonne
+\definecolor{borderblue}{RGB}{12, 53, 106}      % Bleu pour les bordures
+\definecolor{captionblue}{RGB}{12, 53, 106}     % Bleu pour le texte de la légende
+
+\begin{document}
+
+\begin{table}[htbp]
+\centering
+\begin{tcolorbox}[
+    enhanced,
+    colframe=borderblue,
+    colback=white,
+    boxrule=1.2pt,
+    arc=0mm,
+    boxsep=0pt,
+    left=0pt,
+    right=0pt,
+    top=0pt,
+    bottom=0pt,
+    width=0.75\textwidth    % <--- 1. تصغير عرض الجدول (كانت 0.92)
+]
+\renewcommand{\arraystretch}{1.2} % <--- 2. تقليص الفراغ العمودي بين الأسطر (كانت 1.6)
+\setlength{\arrayrulewidth}{0.6pt}
+\arrayrulecolor{borderblue}
+
+\small % <--- 3. تصغير حجم الخط داخل الجدول (تنجم تستعمل زادة \footnotesize)
+
+\begin{tabularx}{\textwidth}{
+    |>{\columncolor{colblue}\bfseries\raggedright\arraybackslash}p{0.42\textwidth}
+    |>{\raggedright\arraybackslash}X|
+}
+\hline
+\rowcolor{headerblue}
+\multicolumn{1}{|c|}{\textcolor{white}{\large\bfseries Caractéristique}} & 
+\multicolumn{1}{c|}{\textcolor{white}{\large\bfseries Description}} \\ \hline
+
+Type de capteur & Capteur numérique \\ \hline
+
+Composantes mesurées & Rouge (R), Verte (G), Bleue (B) et Claire (C) \\ \hline
+
+Communication & Bus I2C \\ \hline
+
+Microcontrôleur compatible & ESP32 \\ \hline
+
+Tension d'alimentation & Compatible avec le niveau logique 3,3 V de l'ESP32 \\ \hline
+\end{tabularx}
+\end{tcolorbox}
+\caption{Caractéristiques du capteur de couleur TCS34725}
+\label{tab:moteur_dc_specs}
+\end{table}
+\vspace{-4pt} % للتعديل في المسافة العمودية
+{\color{sourcegray}\small\itshape Source : Datasheet officielle du capteur de couleur TCS34725 \cite{tcs} }
+
+Le capteur possède des paramètres configurables, notamment le temps d'intégration et le gain.
+
+L'utilisation d'un éclairage blanc et d'une protection contre la lumière ambiante permet d'améliorer la stabilité des mesures.
+
+La normalisation des composantes par la valeur claire permet de réduire l'influence des variations d'éclairage :
+
+\[
+r=\frac{R}{C},\qquad
+g=\frac{G}{C},\qquad
+b=\frac{B}{C}
+\]
+
+Ces valeurs normalisées peuvent ensuite être comparées à des seuils définis pour distinguer les couleurs A et B.
+
+\subsection{Servomoteur SG90}
+\begin{document}
+
+\begin{table}[htbp]
+\centering
+\begin{tcolorbox}[
+    enhanced,
+    colframe=borderblue,
+    colback=white,
+    boxrule=1.2pt,
+    arc=0mm,
+    boxsep=0pt,
+    left=0pt,
+    right=0pt,
+    top=0pt,
+    bottom=0pt,
+    width=0.75\textwidth    % <--- 1. تصغير عرض الجدول (كانت 0.92)
+]
+\renewcommand{\arraystretch}{1.2} % <--- 2. تقليص الفراغ العمودي بين الأسطر (كانت 1.6)
+\setlength{\arrayrulewidth}{0.6pt}
+\arrayrulecolor{borderblue}
+
+\small % <--- 3. تصغير حجم الخط داخل الجدول (تنجم تستعمل زادة \footnotesize)
+
+\begin{tabularx}{\textwidth}{
+    |>{\columncolor{colblue}\bfseries\raggedright\arraybackslash}p{0.42\textwidth}
+    |>{\raggedright\arraybackslash}X|
+}
+\hline
+\rowcolor{headerblue}
+\multicolumn{1}{|c|}{\textcolor{white}{\large\bfseries Caractéristique}} & 
+\multicolumn{1}{c|}{\textcolor{white}{\large\bfseries Description}} \\ \hline
+
+Modèle  & SG90  \\ \hline
+
+Tension nominale indiquée  & 4,8 V  \\ \hline
+
+Couple de blocage  & 1,8 kg·cm  \\ \hline
+
+Vitesse  & 0,12 s / 60°  \\ \hline
+
+Poids  & 9g  \\ \hline
+
+Dimensions  & 23 × 12,2 × 29 mm  \\ \hline
+\end{tabularx}
+\end{tcolorbox}
+\caption{Caractéristiques du Servomoteur }
+\label{tab:moteur_dc_specs}
+\end{table}
+% --- Source en gris et en petit ---
+\vspace{-4pt} % للتعديل في المسافة العمودية
+{\color{sourcegray}\small\itshape Source : Datasheet officielle Servomoteur SG90 \cite{sg}}
+\clearpage
+\subsection{Capteur photoélectrique infrarouge}
+\begin{document}
+
+\begin{table}[htbp]
+\centering
+\begin{tcolorbox}[
+    enhanced,
+    colframe=borderblue,
+    colback=white,
+    boxrule=1.2pt,
+    arc=0mm,
+    boxsep=0pt,
+    left=0pt,
+    right=0pt,
+    top=0pt,
+    bottom=0pt,
+    width=0.75\textwidth    % <--- 1. تصغير عرض الجدول (كانت 0.92)
+]
+\renewcommand{\arraystretch}{1.2} % <--- 2. تقليص الفراغ العمودي بين الأسطر (كانت 1.6)
+\setlength{\arrayrulewidth}{0.6pt}
+\arrayrulecolor{borderblue}
+
+\small % <--- 3. تصغير حجم الخط داخل الجدول (تنجم تستعمل زادة \footnotesize)
+
+\begin{tabularx}{\textwidth}{
+    |>{\columncolor{colblue}\bfseries\raggedright\arraybackslash}p{0.42\textwidth}
+    |>{\raggedright\arraybackslash}X|
+}
+\hline
+\rowcolor{headerblue}
+\multicolumn{1}{|c|}{\textcolor{white}{\large\bfseries Caractéristique}} & 
+\multicolumn{1}{c|}{\textcolor{white}{\large\bfseries Description}} \\ \hline
+
+Modèle  & OMRON E3Z-D61  \\ \hline
+
+Type de détection  & Diffuse réfléchissante  \\ \hline
+
+Distance de détection  & 100 mm  \\ \hline
+
+Tension d'alimentation  & 12 à 24 V DC  \\ \hline
+
+Source lumineuse  & LED infrarouge (860 nm)  \\ \hline
+
+Type de sortie  & NPN, Open Collector  \\ \hline
+
+Temps de réponse  & 1 ms max.  \\ \hline
+
+Indice de protection  & IP67  \\ \hline
+\end{tabularx}
+\end{tcolorbox}
+\caption{Caractéristiques du capteur photoélectrique infrarouge}
+\label{tab:moteur_dc_specs}
+\end{table}
+% --- Source en gris et en petit ---
+\vspace{-4pt} % للتعديل في المسافة العمودية
+{\color{sourcegray}\small\itshape Source : Datasheet officielle capteur photoélectrique infrarouge \cite{ir} }
+\subsection{Projets similaires}
+Smart Belt By : Mohammad Halaweh et Haytham Saleh \cite{hors}
+
+Presentation of a conveyor controlled by a Siemens S7-1200 \cite{hors1}
+
+
+
+% ==================== COMPARISON ====================
+\section{Tableau comparatif des stratégies de commande}
+
+Trois stratégies de commande peuvent être envisagées pour le moteur du convoyeur.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|p{2.4cm}|p{3.0cm}|p{3.4cm}|p{3.6cm}|p{2.4cm}|}
+\hline
+\rowcolor{Navy}
+\color{white}\textbf{Méthode} &
+\color{white}\textbf{Principe} &
+\color{white}\textbf{Avantages} &
+\color{white}\textbf{Limites} &
+\color{white}\textbf{Verdict} \\
+\hline
+Boucle ouverte &
+PWM fixe sans retour de vitesse &
+Très simple à mettre en œuvre &
+La vitesse dépend de la charge et des perturbations &
+Non retenue \\
+\hline
+Correcteur P &
+Commande proportionnelle à l'erreur &
+Correction simple de la vitesse &
+Erreur statique possible et sensibilité au réglage &
+Solution intermédiaire \\
+\hline
+Correcteur PI &
+Action proportionnelle et intégrale avec codeur &
+Réduction de l'erreur statique et compensation des perturbations constantes &
+Réglage nécessaire, saturation et risque de windup &
+\textbf{Solution retenue} \\
+\hline
+\end{tabular}
+\caption{Comparaison des stratégies de commande pour le système}
+\end{table}
+% --- Source en gris et en petit ---
+\vspace{-4pt} % للتعديل في المسافة العمودية
+{\color{sourcegray}\small\itshape Source : PI Control of a DC Motor\cite{PI} }
+
+% ==================== JUSTIFICATION ====================
+\section{Justification du choix}
+
+Nous retenons une \textbf{régulation PI en boucle fermée associée à une machine à états}, pour les raisons suivantes :
+
+\begin{itemize}[label=\textcolor{Cyan}{$\bullet$}]
+    \item \textbf{Précision :} l'action intégrale permet de réduire l'erreur statique de vitesse et de satisfaire le critère CDC-2.
+    
+    \item \textbf{Rejet des perturbations :} la boucle fermée permet de compenser les variations du couple résistant, notamment la perturbation de 20 \% prévue par le critère CDC-6.
+    
+    \item \textbf{Fiabilité du tri :} une vitesse plus stable rend le calcul du délai $\Delta t=d/v$ plus prévisible et contribue à satisfaire le critère CDC-5.
+    
+    \item \textbf{Séparation des fonctions :} la régulation de vitesse est indépendante de la logique séquentielle du tri. Leur principal lien est la vitesse mesurée.
+    
+\end{itemize}
+
+
+
+\textbf{Regulation du Moteur DC}
+
+En présence d'une augmentation du couple résistant, la vitesse du moteur diminue. Un système en boucle ouverte ne peut pas corriger automatiquement cette variation.
+
+Un correcteur proportionnel peut réduire l'erreur, mais il peut laisser une erreur statique non nulle.
+
+Le correcteur PI ajoute une action intégrale qui permet, en théorie, d'annuler l'erreur statique pour une consigne constante et une perturbation constante, sous réserve de stabilité et de fonctionnement hors saturation.
+
+\begin{infobox}{Principe de la régulation PI}
+Le correcteur PI est défini par :
+
+\[
+C(p)=K_p+\frac{K_i}{p}
+\]
+
+où $K_p$ est le gain proportionnel et $K_i$ le gain intégral.
+
+La commande dépend de l'erreur entre la consigne et la vitesse mesurée.
+\end{infobox}
+
+La saturation de la commande PWM nécessite de prévoir une stratégie anti-windup afin d'éviter l'accumulation excessive de l'action intégrale.
+
+Le réglage des gains $K_p$ et $K_i$ devra également permettre de limiter le dépassement à 10 \% maximum.
+
+
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+block/.style={draw=Blue,fill=LightBlue,rounded corners,minimum width=1.7cm,minimum height=0.9cm,align=center,font=\small},
+sum/.style={draw=Navy,circle,minimum size=0.6cm,inner sep=0pt},
+arrow/.style={-{Stealth[length=2.2mm]},thick,color=Blue}
+]
+
+\node (ref) {$\omega_c$};
+\node[sum,right=0.6cm of ref] (s1) {$\sum$};
+\node[block,right=0.6cm of s1] (pi) {PI};
+\node[block,right=0.7cm of pi] (pwm) {PWM\\Saturation};
+\node[block,right=0.7cm of pwm] (motor) {Moteur DC\\+ Convoyeur};
+\node[right=0.6cm of motor] (out) {$\omega(t)$};
+\node[block,below=1cm of motor] (encoder) {Codeur};
+
+\draw[arrow] (ref)--(s1);
+\draw[arrow] (s1)--node[above,font=\scriptsize]{$e(t)$}(pi);
+\draw[arrow] (pi)--(pwm);
+\draw[arrow] (pwm)--(motor);
+\draw[arrow] (motor)--(out);
+\draw[arrow] (out)|-(encoder);
+\draw[arrow] (encoder.west)-| (s1.south);
+
+\node[anchor=south east,font=\scriptsize] at (s1.north west) {$+$};
+\node[anchor=north east,font=\scriptsize] at (s1.south west) {$-$};
+
+\end{tikzpicture}
+\caption{Structure de la régulation PI en boucle fermée}
+\end{figure}
+
+% ==================== CONCLUSION ====================
+\section{Conclusion de la phase 2}
+
+L'étude bibliographique montre l'intérêt d'une régulation en boucle fermée pour maintenir la vitesse du convoyeur malgré les perturbations mécaniques.
+
+L'étude du capteur TCS34725 a permis de définir une méthode d'acquisition et de traitement des couleurs.
+
+Enfin, l'utilisation d'une machine à états permet d'organiser les différentes étapes du processus de tri et de synchroniser l'actionnement du volet avec le déplacement des pièces.
+
+La solution retenue associe donc une régulation continue de vitesse à une commande séquentielle à événements discrets.
+
+La phase suivante portera sur la modélisation du moteur, l'identification de ses paramètres, le réglage du correcteur PI et la validation par simulation.
+
+% ==================================================
+% REPARTITION DES TACHES
+% ==================================================
+
+
+% ==================================================
+% BIBLIOGRAPHIE
+% ==================================================
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Bibliographie}
+\hypersetup{urlcolor=Navy}
+
+\begin{thebibliography}{9}
+\setlength{\itemsep}{3pt}
+\bibitem{moteur}
+\href{https://www.nidec-components.com/e/catalog/dc-geared-motor/mg16b.pdf}{
+NIDEC. MG16B DC Geared Motors: RoHS compliant - Product Datasheet and Specifications. Nidec Copal Electronics.}
+\bibitem{tcs}
+\href{https://www.alldatasheet.com/datasheet-pdf/view/560511/AMSCO/TCS3472.html}{
+ams AG, TCS3472 Color Light-to-Digital Converter with IR Filter, fiche technique du
+capteur TCS34725, 2013}
+
+\bibitem{sg}
+\href{https://uploads.teachablecdn.com/attachments/5ztZ5ai4Rhi5cNpTPODM_SG90-TowerPro_Datasheet.pdf}{
+TOWERPRO. SG90 9g Micro Servo: Datasheet and Specifications. Tower Pro.}
+\bibitem{ir}
+\href{https://assets.omron.eu/downloads/latest/datasheet/en/e3z_compact_photoelectric_sensor_with_built-in_amplifier_datasheet_en.pdf}{
+OMRON. E3Z Compact Photoelectric Sensor with Built-in Amplifier: Datasheet. Omron Corporation, Industrial Automation Company.}
+
+\bibitem{hors}
+\href{https://repository.najah.edu/server/api/core/bitstreams/8578776a-8613-405f-9535-5fa5de79e234/content}{
+Projet similaire: HALAWEH, Mohammad et SALEH, Haytham. Smart Belt: Color Sorting Machine. Présentation de projet encadrée par le Dr. Sulaiman Abu Kharmah}
+
+
+\bibitem{hors1}
+\href{https://www.youtube.com/watch?v=wABlcmpRDOc}{
+Projet similaire: ARNAUD LE PROF. Présentation convoyeur commandé par un siemens s7-1200. YouTube, 1 mars 2021. Vidéo en ligne.}
+\bibitem{PI}
+\href{https://ctms.engin.umich.edu/CTMS/index.php/Content/Introduction/Control/StateSpace/Content/Activities/Content/Basics/Content/Animations/Content/CruiseControl/Simulink/Simscape/?aux=Activities_DCmotorB}{
+UNIVERSITY OF MICHIGAN. Control Tutorials for MATLAB and Simulink: Cruise Control Simscape Modeling. Département de génie mécanique, Université du Michigan.}
+\end{thebibliography}
+
+\end{document}
